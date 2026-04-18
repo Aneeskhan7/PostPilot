@@ -1,0 +1,43 @@
+# Environment variables — NEVER commit these
+.env
+.env.local
+.env.production
+backend/.env
+frontend/.env
+*.env
+
+# Personal Claude notes — not for the team
+CLAUDE.local.md
+.claude/settings.local.json
+
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Build outputs
+dist/
+build/
+*/dist/
+*/build/
+
+# TypeScript
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# Test coverage
+coverage/
+*/coverage/
+
+# Uploaded media (don't commit user uploads)
+uploads/
