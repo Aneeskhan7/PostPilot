@@ -28,12 +28,33 @@ function consumeState(state: string): string {
   return entry.userId;
 }
 
+// Resolves user ID from Authorization header OR ?token= query param
+async function resolveUserId(req: Request): Promise<string> {
+  const token =
+    req.headers.authorization?.replace('Bearer ', '') ||
+    (req.query.token as string | undefined);
+
+  if (!token) throw new AppError('Missing authorization', 401, 'UNAUTHORIZED');
+
+  const { createClient } = await import('@supabase/supabase-js');
+  const client = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const { data, error } = await client.auth.getUser(token);
+  if (error || !data.user) throw new AppError('Invalid or expired token', 401, 'UNAUTHORIZED');
+  return data.user.id;
+}
+
 // ─── META (Facebook + Instagram) ───────────────────────────────────────────
 
 // GET /auth/meta — redirect user to Facebook OAuth
-router.get('/meta', requireAuth, (req: Request, res: Response) => {
-  const state = generateState(req.user.id);
-  res.redirect(Meta.getOAuthUrl(state));
+// Accepts token via Authorization header OR ?token= query param (browser redirect)
+router.get('/meta', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = await resolveUserId(req);
+    const state = generateState(userId);
+    res.redirect(Meta.getOAuthUrl(state));
+  } catch (err) { next(err); }
 });
 
 // GET /auth/meta/callback — Facebook redirects here after user approves
@@ -124,9 +145,12 @@ router.get('/meta/callback', async (req: Request, res: Response, next: NextFunct
 // ─── LINKEDIN ────────────────────────────────────────────────────────────────
 
 // GET /auth/linkedin — redirect user to LinkedIn OAuth
-router.get('/linkedin', requireAuth, (req: Request, res: Response) => {
-  const state = generateState(req.user.id);
-  res.redirect(LinkedIn.getOAuthUrl(state));
+router.get('/linkedin', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = await resolveUserId(req);
+    const state = generateState(userId);
+    res.redirect(LinkedIn.getOAuthUrl(state));
+  } catch (err) { next(err); }
 });
 
 // GET /auth/linkedin/callback — LinkedIn redirects here after user approves

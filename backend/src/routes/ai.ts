@@ -8,7 +8,7 @@ import { AppError } from '../middleware/errorHandler';
 const router = Router();
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro-latest' });
 
 const GenerateSchema = z.object({
   topic: z.string().min(1, 'Topic is required').max(500),

@@ -4,7 +4,7 @@ import { AppError } from '../middleware/errorHandler';
 const APP_ID = process.env.META_APP_ID!;
 const APP_SECRET = process.env.META_APP_SECRET!;
 const REDIRECT_URI = process.env.META_REDIRECT_URI!;
-const BASE_URL = 'https://graph.facebook.com/v18.0';
+const BASE_URL = 'https://graph.facebook.com/v21.0';
 const TIMEOUT_MS = 10_000;
 
 interface TokenResponse {
@@ -86,11 +86,11 @@ async function metaPost<T>(path: string, params: Record<string, string>): Promis
 
 // Build the OAuth URL to redirect the user to Facebook login
 export function getOAuthUrl(state: string): string {
-  const url = new URL('https://www.facebook.com/v18.0/dialog/oauth');
+  const url = new URL('https://www.facebook.com/v21.0/dialog/oauth');
   url.searchParams.set('client_id', APP_ID);
   url.searchParams.set('redirect_uri', REDIRECT_URI);
   url.searchParams.set('state', state);
-  url.searchParams.set('scope', 'pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish');
+  url.searchParams.set('scope', 'pages_show_list,pages_manage_posts,instagram_content_publish');
   return url.toString();
 }
 

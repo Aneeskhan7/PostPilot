@@ -103,12 +103,12 @@ const Calendar: FC = () => {
                   <button
                     key={day}
                     onClick={() => setSelectedDate(isSelected ? null : dateKey)}
-                    className={`relative aspect-square rounded-xl flex flex-col items-center justify-start pt-1.5 text-sm transition-colors ${
+                    className={`relative h-10 rounded-lg flex flex-col items-center justify-center gap-0.5 text-sm transition-all border ${
                       isSelected
-                        ? 'bg-violet-600/30 border border-violet-500/50 text-violet-300'
+                        ? 'bg-violet-600/30 border-violet-500/50 text-violet-300'
                         : isToday
-                        ? 'bg-white/10 text-white font-semibold'
-                        : 'hover:bg-white/5 text-zinc-400 hover:text-white'
+                        ? 'bg-white/10 border-white/20 text-white font-semibold'
+                        : 'border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 text-zinc-400 hover:text-white'
                     }`}
                   >
                     <span className="text-xs leading-none">{day}</span>
