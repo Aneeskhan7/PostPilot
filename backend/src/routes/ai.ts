@@ -1,14 +1,13 @@
 // backend/src/routes/ai.ts
 import { Router, Request, Response, NextFunction } from 'express';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import Groq from 'groq-sdk';
 import { z } from 'zod';
 import { requireAuth } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 
 const router = Router();
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro-latest' });
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 const GenerateSchema = z.object({
   topic: z.string().min(1, 'Topic is required').max(500),
@@ -18,9 +17,31 @@ const GenerateSchema = z.object({
 });
 
 const PLATFORM_RULES: Record<string, string> = {
-  instagram: 'Instagram caption (max 2200 chars, include 5-10 relevant hashtags at the end if requested, use emojis naturally)',
-  facebook:  'Facebook post (conversational, max 500 words, no need for hashtags)',
-  linkedin:  'LinkedIn post (professional, max 3000 chars, 3-5 hashtags at end if requested, thought-leadership tone)',
+  instagram: `Instagram caption structured as:
+Line 1: Hook sentence with an emoji
+(blank line)
+Lines 2-4: 2-3 short punchy sentences, each on its own line
+(blank line)
+Line 5: Call-to-action sentence
+(blank line)
+Hashtags: 5-10 hashtags each on the same line separated by spaces
+Max 2200 chars. Use emojis naturally.`,
+  facebook: `Facebook post structured as:
+Line 1: Opening hook
+(blank line)
+Lines 2-4: 2-3 body sentences, each on its own line
+(blank line)
+Line 5: Question or call-to-action to drive engagement
+Max 500 words. No hashtags needed.`,
+  linkedin: `LinkedIn post structured as:
+Line 1: Bold hook statement (no emoji)
+(blank line)
+Lines 2-5: 3-4 insight sentences, each on its own line
+(blank line)
+Line 6: Key takeaway or call-to-action
+(blank line)
+Hashtags: 3-5 hashtags on one line
+Max 3000 chars. Professional tone.`,
 };
 
 const TONE_DESC: Record<string, string> = {
@@ -30,25 +51,35 @@ const TONE_DESC: Record<string, string> = {
   inspirational: 'motivational and inspiring',
 };
 
-// POST /api/ai/generate — generate a caption using Gemini
+// POST /api/ai/generate — generate a caption using Groq
 router.post('/generate', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const body = GenerateSchema.parse(req.body);
 
-    if (!process.env.GEMINI_API_KEY) {
+    if (!process.env.GROQ_API_KEY) {
       throw new AppError('AI features not configured', 503, 'AI_NOT_CONFIGURED');
     }
 
-    const prompt = `Write a ${PLATFORM_RULES[body.platform]} about: "${body.topic}".
+    const prompt = `Write a social media post about: "${body.topic}".
 Tone: ${TONE_DESC[body.tone]}.
 ${body.includeHashtags ? 'Include relevant hashtags.' : 'Do not include hashtags.'}
-Return only the caption text — no explanations, no quotes around it, no preamble.`;
 
-    const result = await model.generateContent(prompt);
-    const caption = result.response.text().trim();
+Follow this exact format:
+${PLATFORM_RULES[body.platform]}
+
+IMPORTANT: Use real blank lines between sections. Return only the post text — no explanations, no quotes, no preamble.`;
+
+    const completion = await groq.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.7,
+      max_tokens: 1024,
+    });
+
+    const caption = completion.choices[0]?.message?.content?.trim() ?? '';
 
     if (!caption) {
-      throw new AppError('Gemini returned an empty response', 502, 'AI_EMPTY_RESPONSE');
+      throw new AppError('AI returned an empty response', 502, 'AI_EMPTY_RESPONSE');
     }
 
     res.json({ data: { caption } });
@@ -68,7 +99,7 @@ router.post('/improve', requireAuth, async (req: Request, res: Response, next: N
       instruction: z.string().max(200).default('Make it more engaging'),
     }).parse(req.body);
 
-    if (!process.env.GEMINI_API_KEY) {
+    if (!process.env.GROQ_API_KEY) {
       throw new AppError('AI features not configured', 503, 'AI_NOT_CONFIGURED');
     }
 
@@ -79,11 +110,17 @@ ${body.caption}
 
 Return only the improved caption — no explanations, no quotes, no preamble.`;
 
-    const result = await model.generateContent(prompt);
-    const caption = result.response.text().trim();
+    const completion = await groq.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.7,
+      max_tokens: 1024,
+    });
+
+    const caption = completion.choices[0]?.message?.content?.trim() ?? '';
 
     if (!caption) {
-      throw new AppError('Gemini returned an empty response', 502, 'AI_EMPTY_RESPONSE');
+      throw new AppError('AI returned an empty response', 502, 'AI_EMPTY_RESPONSE');
     }
 
     res.json({ data: { caption } });
