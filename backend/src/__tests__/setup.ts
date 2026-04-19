@@ -6,17 +6,13 @@ config({ path: '.env' });
 
 // Set required test environment variables
 process.env.NODE_ENV = 'test';
-process.env.GEMINI_API_KEY = 'test-gemini-key';
+process.env.GROQ_API_KEY = 'test-groq-key';
 process.env.SUPABASE_URL = 'https://test.supabase.co';
 process.env.SUPABASE_SERVICE_KEY = 'test-service-key';
 process.env.META_APP_ID = 'test-meta-id';
 process.env.META_APP_SECRET = 'test-meta-secret';
 process.env.REDIS_URL = 'redis://localhost:6379';
 process.env.TOKEN_ENCRYPTION_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
-
-// Mock global Date for consistent testing
-vi.useFakeTimers();
-vi.setSystemTime(new Date('2024-04-19T12:00:00.000Z'));
 
 // Global test helpers
 export const createMockSupabase = (overrides: any = {}) => ({

@@ -1,7 +1,7 @@
 // frontend/src/pages/Settings.tsx
 import { FC } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Facebook, Linkedin, Plus, Trash2, CheckCircle2 } from 'lucide-react';
+import { Facebook, Linkedin, Plus, Trash2, CheckCircle2, AlertCircle } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import AccountBadge from '../components/AccountBadge';
 import { useAccounts, useDeleteAccount, useToggleAccount } from '../hooks/useAccounts';
@@ -14,6 +14,7 @@ const API = import.meta.env.VITE_API_URL as string;
 const Settings: FC = () => {
   const [searchParams] = useSearchParams();
   const connected = searchParams.get('connected');
+  const oauthError = searchParams.get('error');
   const { session } = useAuth();
 
   const { data: accounts = [], isLoading } = useAccounts();
@@ -35,6 +36,21 @@ const Settings: FC = () => {
           <h1 className="text-2xl font-bold text-white">Settings</h1>
           <p className="text-sm text-zinc-400 mt-0.5">Manage your connected social accounts</p>
         </div>
+
+        {/* Error banner */}
+        {oauthError && (
+          <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-sm text-red-400 mb-6">
+            <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-medium text-red-300">Connection failed</p>
+              <p className="mt-0.5 text-red-400/80">
+                {oauthError === 'rate_limited'
+                  ? 'Too many requests. Please wait a few minutes and try again.'
+                  : oauthError}
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Success banner */}
         {connected && (

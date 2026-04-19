@@ -37,13 +37,21 @@ if (process.env.NODE_ENV !== 'test') {
   }));
 }
 
-// Stricter limit for auth endpoints
+// Stricter limit for auth endpoints — browser OAuth routes redirect instead of returning JSON
 const authLimiter = process.env.NODE_ENV === 'test' ?
   (req: any, res: any, next: any) => next() :
   rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 10,
-    message: { error: 'Too many requests', code: 'RATE_LIMITED' },
+    handler: (req, res) => {
+      const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:5173';
+      const isBrowserRoute = /^\/(meta|linkedin)/.test(req.path);
+      if (isBrowserRoute) {
+        res.redirect(`${frontendUrl}/settings?error=rate_limited`);
+      } else {
+        res.status(429).json({ error: 'Too many requests', code: 'RATE_LIMITED' });
+      }
+    },
   });
 
 // ─── Routes ──────────────────────────────────────────────────────────────────

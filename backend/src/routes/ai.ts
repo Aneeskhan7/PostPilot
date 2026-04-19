@@ -1,7 +1,7 @@
 // backend/src/routes/ai.ts
 import { Router, Request, Response, NextFunction } from 'express';
 import Groq from 'groq-sdk';
-import { z } from 'zod';
+import { z, ZodError } from 'zod';
 import { requireAuth } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 
@@ -64,7 +64,7 @@ router.post('/generate', requireAuth, async (req: Request, res: Response, next: 
 Tone: ${TONE_DESC[body.tone]}.
 ${body.includeHashtags ? 'Include relevant hashtags.' : 'Do not include hashtags.'}
 
-Follow this exact format:
+Follow this exact format for ${body.platform}:
 ${PLATFORM_RULES[body.platform]}
 
 IMPORTANT: Use real blank lines between sections. Return only the post text — no explanations, no quotes, no preamble.`;
@@ -84,7 +84,7 @@ IMPORTANT: Use real blank lines between sections. Return only the post text — 
 
     res.json({ data: { caption } });
   } catch (err) {
-    if (err instanceof AppError) { next(err); return; }
+    if (err instanceof AppError || err instanceof ZodError) { next(err); return; }
     const msg = err instanceof Error ? err.message : 'AI generation failed';
     next(new AppError(msg, 502, 'AI_ERROR'));
   }
@@ -125,7 +125,7 @@ Return only the improved caption — no explanations, no quotes, no preamble.`;
 
     res.json({ data: { caption } });
   } catch (err) {
-    if (err instanceof AppError) { next(err); return; }
+    if (err instanceof AppError || err instanceof ZodError) { next(err); return; }
     const msg = err instanceof Error ? err.message : 'AI generation failed';
     next(new AppError(msg, 502, 'AI_ERROR'));
   }

@@ -177,12 +177,13 @@ const Composer: FC = () => {
                   <select
                     value={aiTone}
                     onChange={(e) => setAiTone(e.target.value as typeof aiTone)}
-                    className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50 transition [color-scheme:dark]"
+                    className="px-3 py-2 bg-zinc-900 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50 transition appearance-none cursor-pointer"
+                    style={{ colorScheme: 'dark' }}
                   >
-                    <option value="casual">Casual</option>
-                    <option value="professional">Professional</option>
-                    <option value="funny">Funny</option>
-                    <option value="inspirational">Inspirational</option>
+                    <option value="casual" className="bg-zinc-900 text-white">Casual</option>
+                    <option value="professional" className="bg-zinc-900 text-white">Professional</option>
+                    <option value="funny" className="bg-zinc-900 text-white">Funny</option>
+                    <option value="inspirational" className="bg-zinc-900 text-white">Inspirational</option>
                   </select>
                 </div>
 

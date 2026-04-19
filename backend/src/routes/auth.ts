@@ -47,30 +47,53 @@ async function resolveUserId(req: Request): Promise<string> {
 
 // ─── META (Facebook + Instagram) ───────────────────────────────────────────
 
+// Guarantees a profiles row exists for userId before touching social_accounts.
+// Users who signed up before the trigger was deployed won't have one.
+async function ensureProfile(userId: string): Promise<void> {
+  const { data: authUser } = await supabase.auth.admin.getUserById(userId);
+  const user = authUser?.user;
+  const { error } = await supabase.from('profiles').upsert({
+    id: userId,
+    email: user?.email ?? '',
+    full_name: user?.user_metadata?.full_name ?? null,
+    avatar_url: user?.user_metadata?.avatar_url ?? null,
+  }, { onConflict: 'id' });
+  if (error) throw new Error(`Profile sync failed: ${error.message}`);
+}
+
+function oauthError(res: Response, message: string): void {
+  const url = new URL(`${process.env.FRONTEND_URL ?? 'http://localhost:5173'}/settings`);
+  url.searchParams.set('error', message);
+  res.redirect(url.toString());
+}
+
 // GET /auth/meta — redirect user to Facebook OAuth
 // Accepts token via Authorization header OR ?token= query param (browser redirect)
-router.get('/meta', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/meta', async (req: Request, res: Response) => {
   try {
     const userId = await resolveUserId(req);
     const state = generateState(userId);
     res.redirect(Meta.getOAuthUrl(state));
-  } catch (err) { next(err); }
+  } catch (err) {
+    oauthError(res, err instanceof Error ? err.message : 'Could not start Meta OAuth');
+  }
 });
 
 // GET /auth/meta/callback — Facebook redirects here after user approves
-router.get('/meta/callback', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/meta/callback', async (req: Request, res: Response) => {
   try {
     const { code, state, error } = req.query as Record<string, string>;
 
     if (error) {
-      throw new AppError(`Facebook OAuth denied: ${error}`, 400, 'OAUTH_DENIED');
+      return oauthError(res, `Facebook OAuth denied: ${error}`);
     }
 
     if (!code || !state) {
-      throw new AppError('Missing code or state', 400, 'INVALID_CALLBACK');
+      return oauthError(res, 'Missing code or state');
     }
 
     const userId = consumeState(state);
+    await ensureProfile(userId);
 
     // Exchange code → short-lived token → long-lived token
     const shortToken = await Meta.exchangeCodeForToken(code);
@@ -81,7 +104,7 @@ router.get('/meta/callback', async (req: Request, res: Response, next: NextFunct
     const pages = await Meta.getUserPages(longLived.access_token);
 
     if (pages.length === 0) {
-      throw new AppError('No Facebook Pages found. You must manage at least one Page.', 422, 'NO_PAGES');
+      return oauthError(res, 'No Facebook Pages found. You must manage at least one Page.');
     }
 
     // Save each Facebook Page (and linked Instagram account) as a social_account
@@ -138,35 +161,38 @@ router.get('/meta/callback', async (req: Request, res: Response, next: NextFunct
 
     res.redirect(`${process.env.FRONTEND_URL}/settings?connected=meta`);
   } catch (err) {
-    next(err);
+    oauthError(res, err instanceof Error ? err.message : 'Meta connection failed');
   }
 });
 
 // ─── LINKEDIN ────────────────────────────────────────────────────────────────
 
 // GET /auth/linkedin — redirect user to LinkedIn OAuth
-router.get('/linkedin', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/linkedin', async (req: Request, res: Response) => {
   try {
     const userId = await resolveUserId(req);
     const state = generateState(userId);
     res.redirect(LinkedIn.getOAuthUrl(state));
-  } catch (err) { next(err); }
+  } catch (err) {
+    oauthError(res, err instanceof Error ? err.message : 'Could not start LinkedIn OAuth');
+  }
 });
 
 // GET /auth/linkedin/callback — LinkedIn redirects here after user approves
-router.get('/linkedin/callback', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/linkedin/callback', async (req: Request, res: Response) => {
   try {
     const { code, state, error } = req.query as Record<string, string>;
 
     if (error) {
-      throw new AppError(`LinkedIn OAuth denied: ${error}`, 400, 'OAUTH_DENIED');
+      return oauthError(res, `LinkedIn OAuth denied: ${error}`);
     }
 
     if (!code || !state) {
-      throw new AppError('Missing code or state', 400, 'INVALID_CALLBACK');
+      return oauthError(res, 'Missing code or state');
     }
 
     const userId = consumeState(state);
+    await ensureProfile(userId);
 
     const tokenData = await LinkedIn.exchangeCodeForToken(code);
     const profile = await LinkedIn.getProfile(tokenData.access_token);
@@ -191,7 +217,7 @@ router.get('/linkedin/callback', async (req: Request, res: Response, next: NextF
 
     res.redirect(`${process.env.FRONTEND_URL}/settings?connected=linkedin`);
   } catch (err) {
-    next(err);
+    oauthError(res, err instanceof Error ? err.message : 'LinkedIn connection failed');
   }
 });
 
