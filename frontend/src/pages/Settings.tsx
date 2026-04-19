@@ -20,7 +20,12 @@ import Sidebar from '../components/Sidebar';
 import AccountBadge from '../components/AccountBadge';
 import { useAccounts, useDeleteAccount, useToggleAccount } from '../hooks/useAccounts';
 import { useAuth } from '../hooks/useAuth';
+import { useProfile } from '../hooks/useProfile';
+import { useCreateCheckout, useCreatePortal } from '../hooks/useBilling';
 import type { SocialAccount } from '../types';
+
+const PRO_PRICE_ID = import.meta.env.VITE_STRIPE_PRO_PRICE_ID as string;
+const UNLIMITED_PRICE_ID = import.meta.env.VITE_STRIPE_UNLIMITED_PRICE_ID as string;
 
 const API = import.meta.env.VITE_API_URL as string;
 
@@ -62,11 +67,17 @@ const PLATFORMS: PlatformCard[] = [
   },
 ];
 
+const PLAN_DAILY_LIMITS: Record<string, number | null> = { free: 2, pro: 8, unlimited: null };
+
 const Settings: FC = () => {
   const [searchParams] = useSearchParams();
   const connected = searchParams.get('connected');
+  const billing = searchParams.get('billing');
   const oauthError = searchParams.get('error');
   const { session } = useAuth();
+  const { data: profile } = useProfile();
+  const createCheckout = useCreateCheckout();
+  const createPortal = useCreatePortal();
 
   const { data: accounts = [], isLoading } = useAccounts();
   const deleteAccount = useDeleteAccount();
@@ -177,6 +188,70 @@ const Settings: FC = () => {
               );
             })}
           </div>
+        </div>
+
+        {/* Billing banner */}
+        {billing === 'success' && (
+          <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-sm mb-6">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+            <p className="text-emerald-400">Subscription activated! Your plan has been upgraded.</p>
+          </div>
+        )}
+
+        {/* Billing */}
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-6 mb-6">
+          <h2 className="text-sm font-semibold text-white mb-1">Billing</h2>
+          <p className="text-xs text-zinc-500 mb-4">
+            Current plan: <span className="text-white font-medium capitalize">{profile?.plan ?? 'free'}</span>
+            {profile && PLAN_DAILY_LIMITS[profile.plan] !== null && (
+              <> · {PLAN_DAILY_LIMITS[profile.plan]} posts/day</>
+            )}
+            {profile?.plan === 'unlimited' && <> · Unlimited posts/day</>}
+          </p>
+
+          {(!profile || profile.plan === 'free') && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="border border-white/10 rounded-xl p-4 space-y-3">
+                <div>
+                  <p className="text-sm font-semibold text-white">Pro</p>
+                  <p className="text-2xl font-bold text-white mt-0.5">$3<span className="text-sm font-normal text-zinc-400">/mo</span></p>
+                  <p className="text-xs text-zinc-400 mt-1">8 posts per day · All platforms</p>
+                </div>
+                <button
+                  onClick={() => createCheckout.mutate(PRO_PRICE_ID)}
+                  disabled={createCheckout.isPending || !PRO_PRICE_ID}
+                  className="w-full py-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
+                >
+                  {createCheckout.isPending ? 'Redirecting…' : 'Upgrade to Pro'}
+                </button>
+              </div>
+
+              <div className="border border-amber-500/30 rounded-xl p-4 space-y-3 bg-amber-500/5">
+                <div>
+                  <p className="text-sm font-semibold text-white">Unlimited</p>
+                  <p className="text-2xl font-bold text-white mt-0.5">$9<span className="text-sm font-normal text-zinc-400">/mo</span></p>
+                  <p className="text-xs text-zinc-400 mt-1">Unlimited posts · All platforms</p>
+                </div>
+                <button
+                  onClick={() => createCheckout.mutate(UNLIMITED_PRICE_ID)}
+                  disabled={createCheckout.isPending || !UNLIMITED_PRICE_ID}
+                  className="w-full py-2 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black text-sm font-medium rounded-lg transition-colors"
+                >
+                  {createCheckout.isPending ? 'Redirecting…' : 'Upgrade to Unlimited'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {profile && profile.plan !== 'free' && (
+            <button
+              onClick={() => createPortal.mutate()}
+              disabled={createPortal.isPending}
+              className="px-4 py-2 bg-white/10 hover:bg-white/15 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              {createPortal.isPending ? 'Redirecting…' : 'Manage Subscription'}
+            </button>
+          )}
         </div>
 
         {/* Connected accounts list */}

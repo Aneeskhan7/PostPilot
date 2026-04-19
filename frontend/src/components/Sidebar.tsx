@@ -9,8 +9,18 @@ import {
   Settings,
   LogOut,
   Rocket,
+  BookOpen,
+  ShieldCheck,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import { useAuthStore } from '../store/authStore';
+import { useProfile } from '../hooks/useProfile';
+
+const PLAN_LABELS: Record<string, string> = {
+  free: 'Free plan',
+  pro: 'Pro plan · $3/mo',
+  unlimited: 'Unlimited plan',
+};
 
 interface NavItem {
   to: string;
@@ -23,17 +33,26 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/composer',  icon: ({ className }) => <PenSquare className={className} />,      label: 'Composer'  },
   { to: '/calendar',  icon: ({ className }) => <CalendarDays className={className} />,   label: 'Calendar'  },
   { to: '/history',   icon: ({ className }) => <History className={className} />,        label: 'History'   },
+  { to: '/guide',     icon: ({ className }) => <BookOpen className={className} />,       label: 'Guide'     },
   { to: '/settings',  icon: ({ className }) => <Settings className={className} />,       label: 'Settings'  },
 ];
 
 const Sidebar: FC = () => {
   const { user, signOut } = useAuth();
+  const { isAdmin } = useAuthStore();
+  const { data: profile } = useProfile();
   const navigate = useNavigate();
 
   const handleSignOut = async () => {
     await signOut();
     navigate('/login');
   };
+
+  const planLabel = profile ? (PLAN_LABELS[profile.plan] ?? 'Free plan') : 'Free plan';
+  const dailyLimit = profile?.plan === 'free' ? 2 : profile?.plan === 'pro' ? 8 : null;
+  const postsLeft = dailyLimit !== null && profile
+    ? Math.max(0, dailyLimit - (new Date() > new Date(profile.daily_reset_at) ? 0 : profile.daily_post_count))
+    : null;
 
   return (
     <aside className="fixed inset-y-0 left-0 w-60 bg-zinc-900/80 border-r border-white/5 backdrop-blur-sm flex flex-col z-40">
@@ -71,13 +90,36 @@ const Sidebar: FC = () => {
             )}
           </NavLink>
         ))}
+
+        {isAdmin && (
+          <NavLink
+            to="/admin"
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                isActive
+                  ? 'bg-violet-600/20 text-violet-400 border border-violet-500/20'
+                  : 'text-zinc-400 hover:text-white hover:bg-white/5'
+              }`
+            }
+          >
+            {({ isActive }) => (
+              <>
+                <ShieldCheck className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-violet-400' : ''}`} />
+                Admin
+              </>
+            )}
+          </NavLink>
+        )}
       </nav>
 
       {/* User + Sign out */}
       <div className="px-3 py-4 border-t border-white/5 space-y-1">
         <div className="px-3 py-2">
           <p className="text-xs font-medium text-white truncate">{user?.email}</p>
-          <p className="text-xs text-zinc-500">Free plan</p>
+          <p className="text-xs text-zinc-500">{planLabel}</p>
+          {postsLeft !== null && (
+            <p className="text-xs text-zinc-600 mt-0.5">{postsLeft} post{postsLeft !== 1 ? 's' : ''} left today</p>
+          )}
         </div>
         <button
           onClick={handleSignOut}

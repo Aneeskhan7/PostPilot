@@ -5,6 +5,7 @@ import { supabase } from '../db/supabase';
 import { requireAuth } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { schedulePost, cancelPost, reschedulePost } from '../services/scheduler';
+import type { Plan } from '../db/types';
 
 const router = Router();
 
@@ -24,15 +25,32 @@ const UpdatePostSchema = z.object({
   scheduled_at: z.string().datetime().nullable().optional(),
 });
 
-async function enforceFreeLimit(userId: string): Promise<void> {
+const PLAN_DAILY_LIMITS: Record<Plan, number | null> = {
+  free: 2,
+  pro: 8,
+  unlimited: null,
+};
+
+async function enforcePlanLimit(userId: string): Promise<void> {
   const { data: profile } = await supabase
     .from('profiles')
-    .select('plan, monthly_post_count')
+    .select('plan, daily_post_count, daily_reset_at')
     .eq('id', userId)
     .single();
 
-  if (profile?.plan === 'free' && (profile?.monthly_post_count ?? 0) >= 10) {
-    throw new AppError('Free plan limit reached (10 posts/month)', 422, 'FREE_LIMIT_REACHED');
+  if (!profile) throw new AppError('Profile not found', 404, 'NOT_FOUND');
+
+  const now = new Date();
+  const resetAt = new Date(profile.daily_reset_at);
+  const effectiveCount = now > resetAt ? 0 : profile.daily_post_count;
+
+  const limit = PLAN_DAILY_LIMITS[profile.plan];
+  if (limit !== null && effectiveCount >= limit) {
+    throw new AppError(
+      `${profile.plan} plan limit reached (${limit} posts/day)`,
+      422,
+      'PLAN_LIMIT_REACHED'
+    );
   }
 }
 
@@ -83,7 +101,7 @@ router.get('/:id', requireAuth, async (req: Request, res: Response, next: NextFu
 router.post('/', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const body = CreatePostSchema.parse(req.body);
-    await enforceFreeLimit(req.user.id);
+    await enforcePlanLimit(req.user.id);
 
     const status = body.scheduled_at ? 'scheduled' : 'draft';
 

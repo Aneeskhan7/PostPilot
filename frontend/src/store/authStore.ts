@@ -7,6 +7,7 @@ interface AuthState {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  isAdmin: boolean;
   setSession: (session: Session | null) => void;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string, fullName: string) => Promise<void>;
@@ -14,10 +15,20 @@ interface AuthState {
   initialize: () => Promise<() => void>;
 }
 
+async function fetchIsAdmin(userId: string): Promise<boolean> {
+  const { data } = await supabase
+    .from('profiles')
+    .select('is_admin')
+    .eq('id', userId)
+    .single();
+  return (data as { is_admin?: boolean } | null)?.is_admin ?? false;
+}
+
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   session: null,
   loading: true,
+  isAdmin: false,
 
   setSession: (session) =>
     set({ session, user: session?.user ?? null, loading: false }),
@@ -38,20 +49,26 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   signOut: async () => {
     await supabase.auth.signOut();
-    set({ user: null, session: null });
+    set({ user: null, session: null, isAdmin: false });
   },
 
   initialize: async () => {
     const { data } = await supabase.auth.getSession();
+    const user = data.session?.user ?? null;
+    const isAdmin = user ? await fetchIsAdmin(user.id) : false;
+
     set({
       session: data.session,
-      user: data.session?.user ?? null,
+      user,
+      isAdmin,
       loading: false,
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        set({ session, user: session?.user ?? null, loading: false });
+      async (_event, session) => {
+        const newUser = session?.user ?? null;
+        const newIsAdmin = newUser ? await fetchIsAdmin(newUser.id) : false;
+        set({ session, user: newUser, isAdmin: newIsAdmin, loading: false });
       }
     );
 

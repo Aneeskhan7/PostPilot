@@ -4,4 +4,8 @@ export const QUERY_KEYS = {
   post: (id: string) => ['posts', id] as const,
   postsByStatus: (status: string) => ['posts', { status }] as const,
   accounts: ['accounts'] as const,
+  profile: ['profile'] as const,
+  adminStats: ['admin', 'stats'] as const,
+  adminUsers: (page: number) => ['admin', 'users', page] as const,
+  adminUser: (id: string) => ['admin', 'users', id] as const,
 };

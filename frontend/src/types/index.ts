@@ -5,7 +5,7 @@ export type { User, Session };
 
 export type Platform = 'instagram' | 'facebook' | 'linkedin';
 export type PostStatus = 'draft' | 'scheduled' | 'publishing' | 'published' | 'failed' | 'cancelled';
-export type Plan = 'free' | 'pro';
+export type Plan = 'free' | 'pro' | 'unlimited';
 
 export interface Profile {
   id: string;
@@ -15,6 +15,9 @@ export interface Profile {
   plan: Plan;
   monthly_post_count: number;
   monthly_reset_at: string;
+  daily_post_count: number;
+  daily_reset_at: string;
+  is_admin: boolean;
 }
 
 export interface SocialAccount {
@@ -69,6 +72,43 @@ export interface UpdatePostInput {
   platforms?: Platform[];
   media_urls?: string[];
   scheduled_at?: string | null;
+}
+
+export interface AdminUserSummary {
+  id: string;
+  email: string;
+  full_name: string | null;
+  plan: Plan;
+  daily_post_count: number;
+  monthly_post_count: number;
+  stripe_customer_id: string | null;
+  created_at: string;
+  social_accounts_count: number;
+}
+
+export interface AdminUserDetail extends AdminUserSummary {
+  avatar_url: string | null;
+  stripe_subscription_id: string | null;
+  is_admin: boolean;
+  updated_at: string;
+  total_posts: number;
+  social_accounts: {
+    id: string;
+    platform: Platform;
+    platform_username: string;
+    platform_avatar_url: string | null;
+    page_name: string | null;
+    is_active: boolean;
+    token_expires_at: string | null;
+    created_at: string;
+  }[];
+}
+
+export interface AdminStats {
+  total_users: number;
+  plan_distribution: Record<Plan, number>;
+  total_posts: number;
+  posts_today: number;
 }
 
 export interface ApiResponse<T> {

@@ -5,7 +5,7 @@ export type Json = string | number | boolean | null | { [key: string]: Json } | 
 export type Platform = 'instagram' | 'facebook' | 'linkedin';
 export type PostStatus = 'draft' | 'scheduled' | 'publishing' | 'published' | 'failed' | 'cancelled';
 export type JobStatus = 'pending' | 'active' | 'completed' | 'failed' | 'delayed';
-export type Plan = 'free' | 'pro';
+export type Plan = 'free' | 'pro' | 'unlimited';
 
 export interface Database {
   public: {
@@ -19,7 +19,11 @@ export interface Database {
           plan: Plan;
           monthly_post_count: number;
           monthly_reset_at: string;
+          daily_post_count: number;
+          daily_reset_at: string;
           stripe_customer_id: string | null;
+          stripe_subscription_id: string | null;
+          is_admin: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -31,7 +35,11 @@ export interface Database {
           plan?: Plan;
           monthly_post_count?: number;
           monthly_reset_at?: string;
+          daily_post_count?: number;
+          daily_reset_at?: string;
           stripe_customer_id?: string | null;
+          stripe_subscription_id?: string | null;
+          is_admin?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -41,7 +49,11 @@ export interface Database {
           plan?: Plan;
           monthly_post_count?: number;
           monthly_reset_at?: string;
+          daily_post_count?: number;
+          daily_reset_at?: string;
           stripe_customer_id?: string | null;
+          stripe_subscription_id?: string | null;
+          is_admin?: boolean;
           updated_at?: string;
         };
         Relationships: [];
@@ -205,6 +217,10 @@ export interface Database {
     Views: Record<never, never>;
     Functions: {
       increment_monthly_post_count: {
+        Args: { user_id_input: string };
+        Returns: undefined;
+      };
+      increment_post_counts: {
         Args: { user_id_input: string };
         Returns: undefined;
       };

@@ -185,8 +185,7 @@ async function processJob(job: Job<PublishJobData>): Promise<void> {
   });
   await updateJobRecord(post.id, 'completed', job.attemptsMade + 1);
 
-  // Increment monthly post count
-  await supabase.rpc('increment_monthly_post_count', { user_id_input: post.user_id });
+  await supabase.rpc('increment_post_counts', { user_id_input: post.user_id });
 
   console.log(`[WORKER] Post ${post.id} published successfully`);
 }
