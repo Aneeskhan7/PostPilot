@@ -29,7 +29,7 @@ const InstagramPreview: FC<Omit<PlatformPreviewProps, 'platform'>> = ({
           : <Instagram className="w-4 h-4 text-white" />}
       </div>
       <div>
-        <p className="text-sm font-semibold text-white">{username || 'your_account'}</p>
+        <p className="text-sm font-semibold text-white">{username || '@username'}</p>
       </div>
       <div className="ml-auto text-zinc-400">···</div>
     </div>

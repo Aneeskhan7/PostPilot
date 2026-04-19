@@ -1,5 +1,5 @@
 // frontend/src/pages/Composer.tsx
-import { FC, useState } from 'react';
+import { FC, useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -38,7 +38,7 @@ const Composer: FC = () => {
 
   const createPost = useCreatePost();
   const { data: accounts = [] } = useAccounts();
-  const { getAccessToken } = useAuth();
+  const { getToken } = useAuth();
 
   const [aiTopic, setAiTopic] = useState('');
   const [aiTone, setAiTone] = useState<'professional' | 'casual' | 'funny' | 'inspirational'>('casual');
@@ -55,6 +55,16 @@ const Composer: FC = () => {
   const mediaUrls  = watch('media_urls');
   const platforms  = watch('platforms');
 
+  const connectedPlatforms = PLATFORMS
+    .filter(({ id }) => accounts.some((a: { platform: string; is_active: boolean }) => a.platform === id && a.is_active))
+    .map(({ id }) => id);
+
+  useEffect(() => {
+    if (connectedPlatforms.length > 0 && !connectedPlatforms.includes(previewPlatform)) {
+      setPreviewPlatform(connectedPlatforms[0]);
+    }
+  }, [connectedPlatforms.join(',')]);
+
   const togglePlatform = (p: Platform) => {
     const current = platforms ?? [];
     setValue(
@@ -64,8 +74,11 @@ const Composer: FC = () => {
     );
   };
 
+  const selectAll = () => setValue('platforms', connectedPlatforms, { shouldValidate: true });
+  const selectNone = () => setValue('platforms', [], { shouldValidate: true });
+
   const handleGenerate = async () => {
-    const token = getAccessToken();
+    const token = await getToken();
     if (!token || !aiTopic.trim()) return;
     const platform = platforms?.[0] ?? 'instagram';
     setAiError('');
@@ -81,7 +94,7 @@ const Composer: FC = () => {
   };
 
   const handleImprove = async () => {
-    const token = getAccessToken();
+    const token = await getToken();
     if (!token || !content.trim()) return;
     const platform = platforms?.[0] ?? 'instagram';
     setAiError('');
@@ -130,7 +143,27 @@ const Composer: FC = () => {
 
               {/* Platform selector */}
               <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-2">Platforms</label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-sm font-medium text-zinc-300">Platforms</label>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={selectAll}
+                      disabled={connectedPlatforms.length === 0}
+                      className="text-xs px-2 py-0.5 rounded text-zinc-400 hover:text-white hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      All
+                    </button>
+                    <span className="text-zinc-700 text-xs">·</span>
+                    <button
+                      type="button"
+                      onClick={selectNone}
+                      className="text-xs px-2 py-0.5 rounded text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
+                    >
+                      None
+                    </button>
+                  </div>
+                </div>
                 <div className="flex gap-3">
                   {PLATFORMS.map(({ id, label, icon: Icon }) => {
                     const selected = platforms?.includes(id);
@@ -141,13 +174,13 @@ const Composer: FC = () => {
                         type="button"
                         onClick={() => togglePlatform(id)}
                         disabled={!connected}
-                        title={!connected ? `Connect ${label} in Settings` : label}
+                        title={!connected ? `Connect ${label} in Settings first` : selected ? `Remove ${label}` : `Add ${label}`}
                         className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium transition-all ${
                           selected
                             ? 'bg-violet-600/20 border-violet-500/50 text-violet-300'
                             : connected
                             ? 'bg-white/5 border-white/10 text-zinc-400 hover:border-white/20 hover:text-white'
-                            : 'bg-white/5 border-white/5 text-zinc-600 cursor-not-allowed'
+                            : 'bg-white/5 border-white/5 text-zinc-600 cursor-not-allowed opacity-50'
                         }`}
                       >
                         <Icon className="w-4 h-4" />
@@ -325,6 +358,11 @@ const Composer: FC = () => {
             </div>
           </div>
 
+          {!previewAccount && (
+            <p className="text-xs text-zinc-500 text-center py-1">
+              {previewPlatform.charAt(0).toUpperCase() + previewPlatform.slice(1)} not connected — preview is generic
+            </p>
+          )}
           <PlatformPreview
             platform={previewPlatform}
             content={content}

@@ -67,6 +67,18 @@ function oauthError(res: Response, message: string): void {
   res.redirect(url.toString());
 }
 
+// GET /auth/meta/debug-pages — temporarily dump what /me/accounts returns
+router.get('/meta/debug-pages', async (req: Request, res: Response) => {
+  try {
+    const token = req.query.token as string;
+    if (!token) return res.status(400).json({ error: 'provide ?token=<user_access_token>' });
+    const pages = await Meta.getUserPages(token);
+    res.json({ pages });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 // GET /auth/meta — redirect user to Facebook OAuth
 // Accepts token via Authorization header OR ?token= query param (browser redirect)
 router.get('/meta', async (req: Request, res: Response) => {
@@ -99,61 +111,63 @@ router.get('/meta/callback', async (req: Request, res: Response) => {
     const shortToken = await Meta.exchangeCodeForToken(code);
     const longLived = await Meta.getLongLivedToken(shortToken);
     const expiresAt = new Date(Date.now() + longLived.expires_in * 1000).toISOString();
+    const encryptedUserToken = encrypt(longLived.access_token);
 
-    // Fetch pages the user manages
+    // Always save the personal Facebook profile
+    const fbProfile = await Meta.getPersonalProfile(longLived.access_token);
+    const { error: personalErr } = await supabase.from('social_accounts').upsert({
+      user_id: userId,
+      platform: 'facebook',
+      platform_account_id: fbProfile.id,
+      platform_username: fbProfile.name,
+      platform_avatar_url: fbProfile.picture?.data?.url ?? null,
+      access_token: encryptedUserToken,
+      token_expires_at: expiresAt,
+      page_id: null,
+      page_name: null,
+      is_active: true,
+    }, { onConflict: 'user_id,platform,platform_account_id' });
+    if (personalErr) throw new Error(personalErr.message);
+
+    // Save any Facebook Pages and their linked Instagram Business Accounts
     const pages = await Meta.getUserPages(longLived.access_token);
-
-    if (pages.length === 0) {
-      return oauthError(res, 'No Facebook Pages found. You must manage at least one Page.');
-    }
-
-    // Save each Facebook Page (and linked Instagram account) as a social_account
+    console.log(`[META] Pages found: ${pages.length}`, pages.map(p => ({ id: p.id, name: p.name, ig: p.instagram_business_account?.id ?? 'none' })));
     for (const page of pages) {
       const encryptedPageToken = encrypt(page.access_token);
 
-      // Upsert Facebook Page account
-      const { error: fbError } = await supabase
-        .from('social_accounts')
-        .upsert({
-          user_id: userId,
-          platform: 'facebook',
-          platform_account_id: page.id,
-          platform_username: page.name,
-          access_token: encryptedPageToken,
-          token_expires_at: expiresAt,
-          page_id: page.id,
-          page_name: page.name,
-          is_active: true,
-        }, { onConflict: 'user_id,platform,platform_account_id' });
+      const { error: fbErr } = await supabase.from('social_accounts').upsert({
+        user_id: userId,
+        platform: 'facebook',
+        platform_account_id: page.id,
+        platform_username: page.name,
+        access_token: encryptedPageToken,
+        token_expires_at: expiresAt,
+        page_id: page.id,
+        page_name: page.name,
+        is_active: true,
+      }, { onConflict: 'user_id,platform,platform_account_id' });
+      if (fbErr) throw new Error(fbErr.message);
 
-      if (fbError) throw new Error(fbError.message);
-
-      // If this page has a linked Instagram Business Account, save it too
       if (page.instagram_business_account?.id) {
         try {
           const igAccount = await Meta.getInstagramAccount(
             page.instagram_business_account.id,
             page.access_token
           );
-
-          const { error: igError } = await supabase
-            .from('social_accounts')
-            .upsert({
-              user_id: userId,
-              platform: 'instagram',
-              platform_account_id: igAccount.id,
-              platform_username: igAccount.username,
-              platform_avatar_url: igAccount.profile_picture_url ?? null,
-              access_token: encryptedPageToken,
-              token_expires_at: expiresAt,
-              page_id: page.id,
-              page_name: page.name,
-              is_active: true,
-            }, { onConflict: 'user_id,platform,platform_account_id' });
-
-          if (igError) throw new Error(igError.message);
+          const { error: igErr } = await supabase.from('social_accounts').upsert({
+            user_id: userId,
+            platform: 'instagram',
+            platform_account_id: igAccount.id,
+            platform_username: igAccount.username,
+            platform_avatar_url: igAccount.profile_picture_url ?? null,
+            access_token: encryptedPageToken,
+            token_expires_at: expiresAt,
+            page_id: page.id,
+            page_name: page.name,
+            is_active: true,
+          }, { onConflict: 'user_id,platform,platform_account_id' });
+          if (igErr) throw new Error(igErr.message);
         } catch {
-          // Non-fatal: page may not have an IG account linked
           console.warn(`[META] No Instagram account for page ${page.id}`);
         }
       }
@@ -200,20 +214,38 @@ router.get('/linkedin/callback', async (req: Request, res: Response) => {
     const expiresAt = new Date(Date.now() + tokenData.expires_in * 1000).toISOString();
     const encryptedToken = encrypt(tokenData.access_token);
 
-    const { error: dbError } = await supabase
-      .from('social_accounts')
-      .upsert({
+    // Save personal LinkedIn profile
+    const { error: dbError } = await supabase.from('social_accounts').upsert({
+      user_id: userId,
+      platform: 'linkedin',
+      platform_account_id: profile.sub,
+      platform_username: profile.name,
+      platform_avatar_url: profile.picture ?? null,
+      access_token: encryptedToken,
+      token_expires_at: expiresAt,
+      page_id: null,
+      page_name: null,
+      is_active: true,
+    }, { onConflict: 'user_id,platform,platform_account_id' });
+    if (dbError) throw new Error(dbError.message);
+
+    // Save any LinkedIn Company Pages the user admins (non-fatal if scope not granted)
+    const companyPages = await LinkedIn.getAdminOrganizations(tokenData.access_token);
+    for (const org of companyPages) {
+      const { error: orgErr } = await supabase.from('social_accounts').upsert({
         user_id: userId,
         platform: 'linkedin',
-        platform_account_id: profile.sub,
-        platform_username: profile.name,
-        platform_avatar_url: profile.picture ?? null,
+        platform_account_id: `org_${org.id}`,
+        platform_username: org.name,
+        platform_avatar_url: null,
         access_token: encryptedToken,
         token_expires_at: expiresAt,
+        page_id: org.id,
+        page_name: org.name,
         is_active: true,
       }, { onConflict: 'user_id,platform,platform_account_id' });
-
-    if (dbError) throw new Error(dbError.message);
+      if (orgErr) console.warn(`[LINKEDIN] Failed to save org ${org.id}: ${orgErr.message}`);
+    }
 
     res.redirect(`${process.env.FRONTEND_URL}/settings?connected=linkedin`);
   } catch (err) {

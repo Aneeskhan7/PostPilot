@@ -4,7 +4,9 @@ import { AppError } from '../middleware/errorHandler';
 const APP_ID = process.env.META_APP_ID!;
 const APP_SECRET = process.env.META_APP_SECRET!;
 const REDIRECT_URI = process.env.META_REDIRECT_URI!;
+const IG_REDIRECT_URI = process.env.INSTAGRAM_REDIRECT_URI!;
 const BASE_URL = 'https://graph.facebook.com/v21.0';
+const IG_GRAPH_URL = 'https://graph.instagram.com';
 const TIMEOUT_MS = 10_000;
 
 interface TokenResponse {
@@ -28,6 +30,12 @@ interface InstagramAccount {
   id: string;
   username: string;
   profile_picture_url?: string;
+}
+
+interface PersonalProfile {
+  id: string;
+  name: string;
+  picture?: { data: { url: string } };
 }
 
 interface PublishResult {
@@ -91,6 +99,7 @@ export function getOAuthUrl(state: string): string {
   url.searchParams.set('redirect_uri', REDIRECT_URI);
   url.searchParams.set('state', state);
   url.searchParams.set('scope', 'pages_show_list,pages_manage_posts,instagram_content_publish');
+  url.searchParams.set('auth_type', 'rerequest');
   return url.toString();
 }
 
@@ -112,6 +121,27 @@ export async function getLongLivedToken(shortToken: string): Promise<LongLivedTo
     client_id: APP_ID,
     client_secret: APP_SECRET,
     fb_exchange_token: shortToken,
+  });
+}
+
+// Get Instagram accounts connected to the user's Facebook account via Accounts Centre
+export async function getUserInstagramAccounts(userToken: string): Promise<InstagramAccount[]> {
+  try {
+    const data = await metaGet<{ data: InstagramAccount[] }>('/me/instagram_accounts', {
+      access_token: userToken,
+      fields: 'id,username,profile_picture_url',
+    });
+    return data.data ?? [];
+  } catch {
+    return [];
+  }
+}
+
+// Get the user's personal Facebook profile
+export async function getPersonalProfile(userToken: string): Promise<PersonalProfile> {
+  return metaGet<PersonalProfile>('/me', {
+    access_token: userToken,
+    fields: 'id,name,picture.type(large)',
   });
 }
 
@@ -202,6 +232,75 @@ export async function publishInstagramPost(
   await new Promise((resolve) => setTimeout(resolve, 2000));
 
   return publishInstagramContainer(igAccountId, pageToken, containerId);
+}
+
+// ─── Instagram direct OAuth (no Facebook Page required) ──────────────────────
+
+export function getInstagramOAuthUrl(state: string): string {
+  const url = new URL('https://api.instagram.com/oauth/authorize');
+  url.searchParams.set('client_id', APP_ID);
+  url.searchParams.set('redirect_uri', IG_REDIRECT_URI);
+  url.searchParams.set('scope', 'instagram_basic,instagram_content_publish');
+  url.searchParams.set('response_type', 'code');
+  url.searchParams.set('state', state);
+  return url.toString();
+}
+
+export async function exchangeInstagramCode(code: string): Promise<{ access_token: string; user_id: string }> {
+  const params = new URLSearchParams({
+    client_id: APP_ID,
+    client_secret: APP_SECRET,
+    grant_type: 'authorization_code',
+    redirect_uri: IG_REDIRECT_URI,
+    code,
+  });
+
+  const res = await fetchWithTimeout('https://api.instagram.com/oauth/access_token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: params.toString(),
+  });
+
+  const json = await res.json() as { error_message?: string; access_token?: string; user_id?: number };
+  if (!res.ok || !json.access_token) {
+    throw new AppError(json.error_message ?? 'Failed to exchange Instagram code', 502, 'INSTAGRAM_AUTH_ERROR');
+  }
+  return { access_token: json.access_token, user_id: String(json.user_id) };
+}
+
+export async function getInstagramLongLivedToken(shortToken: string): Promise<{ access_token: string; expires_in: number }> {
+  const url = new URL(`${IG_GRAPH_URL}/access_token`);
+  url.searchParams.set('grant_type', 'ig_exchange_token');
+  url.searchParams.set('client_secret', APP_SECRET);
+  url.searchParams.set('access_token', shortToken);
+
+  const res = await fetchWithTimeout(url.toString());
+  const json = await res.json() as { error?: { message: string }; access_token?: string; expires_in?: number };
+  if (!res.ok || !json.access_token) {
+    throw new AppError(
+      (json as { error?: { message: string } }).error?.message ?? 'Failed to get long-lived Instagram token',
+      502,
+      'INSTAGRAM_AUTH_ERROR'
+    );
+  }
+  return { access_token: json.access_token, expires_in: json.expires_in ?? 5183944 };
+}
+
+export async function getInstagramDirectProfile(accessToken: string): Promise<{ id: string; username: string; profile_picture_url?: string }> {
+  const url = new URL(`${IG_GRAPH_URL}/me`);
+  url.searchParams.set('fields', 'id,username,profile_picture_url');
+  url.searchParams.set('access_token', accessToken);
+
+  const res = await fetchWithTimeout(url.toString());
+  const json = await res.json() as { error?: { message: string }; id?: string; username?: string; profile_picture_url?: string };
+  if (!res.ok || !json.id) {
+    throw new AppError(
+      (json as { error?: { message: string } }).error?.message ?? 'Failed to get Instagram profile',
+      502,
+      'INSTAGRAM_API_ERROR'
+    );
+  }
+  return { id: json.id, username: json.username ?? '', profile_picture_url: json.profile_picture_url };
 }
 
 // Verify a token is still valid and return basic user info

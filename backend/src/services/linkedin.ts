@@ -36,6 +36,21 @@ interface PublishResult {
   id: string;
 }
 
+interface OrgAcl {
+  organizationUrn: string;
+}
+
+interface OrgDetails {
+  id: number;
+  localizedName: string;
+  logoV2?: { original?: { ref: string } };
+}
+
+export interface CompanyPage {
+  id: string;
+  name: string;
+}
+
 async function fetchWithTimeout(url: string, options: RequestInit = {}): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -88,8 +103,39 @@ export function getOAuthUrl(state: string): string {
   url.searchParams.set('client_id', CLIENT_ID);
   url.searchParams.set('redirect_uri', REDIRECT_URI);
   url.searchParams.set('state', state);
-  url.searchParams.set('scope', 'openid profile email w_member_social');
+  url.searchParams.set('scope', 'openid profile email w_member_social w_organization_social r_organization_social');
   return url.toString();
+}
+
+// Get LinkedIn Company Pages where the user is an admin (non-fatal — requires r_organization_social)
+export async function getAdminOrganizations(accessToken: string): Promise<CompanyPage[]> {
+  try {
+    const acls = await linkedInRequest<{ elements: OrgAcl[] }>(
+      'GET',
+      `${BASE_URL}/organizationAcls?q=roleAssignee&role=ADMINISTRATOR&count=10`,
+      accessToken
+    );
+
+    const pages = await Promise.all(
+      (acls.elements ?? []).map(async (acl) => {
+        const orgId = acl.organizationUrn.split(':').pop()!;
+        try {
+          const org = await linkedInRequest<OrgDetails>(
+            'GET',
+            `${BASE_URL}/organizations/${orgId}?projection=(id,localizedName)`,
+            accessToken
+          );
+          return { id: orgId, name: org.localizedName };
+        } catch {
+          return null;
+        }
+      })
+    );
+
+    return pages.filter((p): p is CompanyPage => p !== null);
+  } catch {
+    return [];
+  }
 }
 
 // Exchange the auth code for an access token

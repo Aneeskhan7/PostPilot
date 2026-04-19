@@ -2,6 +2,7 @@
 import 'dotenv/config';
 import app from './app';
 import { startWorker } from './workers/publishWorker';
+import { ensureBucket } from './services/storage';
 
 // Validate required env vars on startup
 const required = [
@@ -21,11 +22,11 @@ const PORT = process.env.PORT ?? 4000;
 // ─── Start ───────────────────────────────────────────────────────────────────
 
 if (process.env.NODE_ENV !== 'test') {
-  app.listen(PORT, () => {
+  app.listen(PORT, async () => {
     console.log(`[SERVER] PostPilot backend running on http://localhost:${PORT}`);
+    await ensureBucket();
+    startWorker();
   });
-
-  startWorker();
 }
 
 export default app;

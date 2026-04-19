@@ -11,7 +11,7 @@ interface MediaUploaderProps {
 }
 
 const MediaUploader: FC<MediaUploaderProps> = ({ urls, onChange, maxFiles = 4 }) => {
-  const { getAccessToken } = useAuth();
+  const { getToken } = useAuth();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -19,7 +19,7 @@ const MediaUploader: FC<MediaUploaderProps> = ({ urls, onChange, maxFiles = 4 })
 
   const upload = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    const token = getAccessToken();
+    const token = await getToken();
     if (!token) return;
 
     const remaining = maxFiles - urls.length;
@@ -42,10 +42,10 @@ const MediaUploader: FC<MediaUploaderProps> = ({ urls, onChange, maxFiles = 4 })
       setUploading(false);
       if (inputRef.current) inputRef.current.value = '';
     }
-  }, [getAccessToken, urls, onChange, maxFiles]);
+  }, [getToken, urls, onChange, maxFiles]);
 
   const remove = async (url: string) => {
-    const token = getAccessToken();
+    const token = await getToken();
     if (!token) return;
     onChange(urls.filter((u) => u !== url));
     try {
