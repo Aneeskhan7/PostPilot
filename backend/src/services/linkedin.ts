@@ -103,7 +103,7 @@ export function getOAuthUrl(state: string): string {
   url.searchParams.set('client_id', CLIENT_ID);
   url.searchParams.set('redirect_uri', REDIRECT_URI);
   url.searchParams.set('state', state);
-  url.searchParams.set('scope', 'openid profile email w_member_social w_organization_social r_organization_social');
+  url.searchParams.set('scope', 'openid profile email w_member_social');
   return url.toString();
 }
 
