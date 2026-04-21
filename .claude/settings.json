@@ -14,8 +14,7 @@
       "Bash(ls *)",
       "Bash(cat *)",
       "Bash(grep *)",
-      "Bash(curl -I *)",
-      "Bash(curl https://your-backend.railway.app/health)",
+      "Bash(curl *)",
       "Read(**)",
       "Write(backend/src/**)",
       "Write(frontend/src/**)",
@@ -23,8 +22,6 @@
       "Write(.github/workflows/**)"
     ],
     "deny": [
-      "Bash(curl -X POST *)",
-      "Bash(curl -X DELETE *)",
       "Bash(rm -rf *)",
       "Bash(sudo *)",
       "Bash(chmod 777 *)",
@@ -32,6 +29,19 @@
       "Write(backend/.env)",
       "Write(frontend/.env)"
     ]
+  },
+  "mcpServers": {
+    "supabase": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@supabase/mcp-server-supabase@latest",
+        "--access-token",
+        "sbp_1bbd2f41c978cdbede2b04feb5eba864f47de0da",
+        "--project-ref",
+        "ybnryiirtrlvoykieikl"
+      ]
+    }
   },
   "hooks": {
     "PreToolUse": [

@@ -24,6 +24,8 @@ interface PageAccount {
   name: string;
   access_token: string;
   instagram_business_account?: { id: string; username?: string; profile_picture_url?: string };
+  connected_instagram_account?: { id: string; username?: string; profile_picture_url?: string };
+  instagram_accounts?: { data: { id: string; username?: string; profile_picture_url?: string }[] };
 }
 
 interface InstagramAccount {
@@ -149,7 +151,7 @@ export async function getPersonalProfile(userToken: string): Promise<PersonalPro
 export async function getUserPages(userToken: string): Promise<PageAccount[]> {
   const data = await metaGet<{ data: PageAccount[] }>('/me/accounts', {
     access_token: userToken,
-    fields: 'id,name,access_token,instagram_business_account{id,username,profile_picture_url}',
+    fields: 'id,name,access_token,instagram_business_account{id,username,profile_picture_url},connected_instagram_account{id,username,profile_picture_url},instagram_accounts{id,username,profile_picture_url}',
   });
   return data.data;
 }
@@ -168,11 +170,14 @@ export async function getPageInstagramAccounts(pageId: string, pageToken: string
 }
 
 // Query a Page directly with page token for its linked Instagram account
-export async function getPageWithInstagram(pageId: string, pageToken: string): Promise<{ instagram_business_account?: { id: string; username?: string; profile_picture_url?: string } }> {
+export async function getPageWithInstagram(pageId: string, pageToken: string): Promise<{
+  instagram_business_account?: { id: string; username?: string; profile_picture_url?: string };
+  connected_instagram_account?: { id: string; username?: string; profile_picture_url?: string };
+}> {
   try {
     return await metaGet(`/${pageId}`, {
       access_token: pageToken,
-      fields: 'instagram_business_account{id,username,profile_picture_url}',
+      fields: 'instagram_business_account{id,username,profile_picture_url},connected_instagram_account{id,username,profile_picture_url}',
     });
   } catch {
     return {};

@@ -138,6 +138,8 @@ router.get('/meta/callback', async (req: Request, res: Response) => {
 
       // Try to save Instagram — check nested data first, then fetch, then page fallback
       let igSaved = false;
+
+      // First try instagram_business_account
       if (page.instagram_business_account?.id) {
         try {
           const nested = page.instagram_business_account;
@@ -160,6 +162,60 @@ router.get('/meta/callback', async (req: Request, res: Response) => {
           console.log(`[META] Saved Instagram account ${igAccount.username} via business account`);
         } catch (e) {
           console.warn(`[META] instagram_business_account fetch failed for page ${page.id}:`, e instanceof Error ? e.message : e);
+        }
+      }
+
+      // Try connected_instagram_account (for Creator accounts)
+      if (!igSaved && page.connected_instagram_account?.id) {
+        try {
+          const nested = page.connected_instagram_account;
+          const igAccount = nested.username
+            ? nested as { id: string; username: string; profile_picture_url?: string }
+            : await Meta.getInstagramAccount(nested.id, page.access_token);
+          await supabase.from('social_accounts').upsert({
+            user_id: userId,
+            platform: 'instagram',
+            platform_account_id: igAccount.id,
+            platform_username: igAccount.username,
+            platform_avatar_url: igAccount.profile_picture_url ?? null,
+            access_token: encryptedPageToken,
+            token_expires_at: expiresAt,
+            page_id: page.id,
+            page_name: page.name,
+            is_active: true,
+          }, { onConflict: 'user_id,platform,platform_account_id' });
+          igSaved = true;
+          console.log(`[META] Saved Instagram account ${igAccount.username} via connected account (Creator)`);
+        } catch (e) {
+          console.warn(`[META] connected_instagram_account fetch failed for page ${page.id}:`, e instanceof Error ? e.message : e);
+        }
+      }
+
+      // Try instagram_accounts array
+      if (!igSaved && page.instagram_accounts?.data?.length) {
+        try {
+          for (const igAcc of page.instagram_accounts.data) {
+            const igAccount = igAcc.username
+              ? igAcc as { id: string; username: string; profile_picture_url?: string }
+              : await Meta.getInstagramAccount(igAcc.id, page.access_token);
+            await supabase.from('social_accounts').upsert({
+              user_id: userId,
+              platform: 'instagram',
+              platform_account_id: igAccount.id,
+              platform_username: igAccount.username,
+              platform_avatar_url: igAccount.profile_picture_url ?? null,
+              access_token: encryptedPageToken,
+              token_expires_at: expiresAt,
+              page_id: page.id,
+              page_name: page.name,
+              is_active: true,
+            }, { onConflict: 'user_id,platform,platform_account_id' });
+            igSaved = true;
+            console.log(`[META] Saved Instagram account ${igAccount.username} via instagram_accounts array`);
+            break; // Only save the first one
+          }
+        } catch (e) {
+          console.warn(`[META] instagram_accounts array fetch failed for page ${page.id}:`, e instanceof Error ? e.message : e);
         }
       }
 
@@ -187,7 +243,9 @@ router.get('/meta/callback', async (req: Request, res: Response) => {
       if (!igSaved) {
         // Fallback 2: query /{page-id} directly with page token
         const pageData = await Meta.getPageWithInstagram(page.id, page.access_token);
-        const igAcc = pageData.instagram_business_account;
+
+        // Check both business and connected account fields
+        const igAcc = pageData.instagram_business_account || pageData.connected_instagram_account;
         if (igAcc?.id) {
           const igProfile = igAcc.username
             ? igAcc as { id: string; username: string; profile_picture_url?: string }
@@ -204,7 +262,8 @@ router.get('/meta/callback', async (req: Request, res: Response) => {
             page_name: page.name,
             is_active: true,
           }, { onConflict: 'user_id,platform,platform_account_id' });
-          console.log(`[META] Saved Instagram via direct page query: ${igProfile.username}`);
+          const accountType = pageData.instagram_business_account ? 'business' : 'connected';
+          console.log(`[META] Saved Instagram via direct page query (${accountType}): ${igProfile.username}`);
           igSaved = true;
         }
       }
