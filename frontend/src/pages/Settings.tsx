@@ -1,7 +1,7 @@
 // frontend/src/pages/Settings.tsx
-import { FC } from 'react';
+import { FC, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Linkedin, Plus, Trash2, CheckCircle2, AlertCircle, RefreshCw, Info } from 'lucide-react';
+import { Linkedin, Plus, Trash2, CheckCircle2, AlertCircle, RefreshCw, Info, X, AlertTriangle } from 'lucide-react';
 
 const FacebookIcon: FC<{ className?: string }> = ({ className }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor">
@@ -61,11 +61,56 @@ const PLATFORMS: PlatformCard[] = [
   },
 ];
 
+interface DisconnectModalProps {
+  account: SocialAccount;
+  onConfirm: () => void;
+  onCancel: () => void;
+  isLoading: boolean;
+}
+
+const DisconnectModal: FC<DisconnectModalProps> = ({ account, onConfirm, onCancel, isLoading }) => (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+    <div className="w-full max-w-sm mx-4 bg-zinc-900 border border-white/10 rounded-2xl p-6 shadow-2xl">
+      <div className="flex items-start justify-between mb-4">
+        <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center">
+          <AlertTriangle className="w-5 h-5 text-red-400" />
+        </div>
+        <button onClick={onCancel} className="text-zinc-500 hover:text-white transition-colors">
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      <h3 className="text-base font-semibold text-white mb-1">Disconnect account?</h3>
+      <p className="text-sm text-zinc-400 mb-6">
+        <span className="text-white font-medium">@{account.platform_username}</span> will be removed.
+        Any scheduled posts to this account will fail.
+      </p>
+
+      <div className="flex gap-3">
+        <button
+          onClick={onCancel}
+          className="flex-1 px-4 py-2 rounded-xl text-sm font-medium bg-white/5 text-zinc-300 hover:bg-white/10 transition-colors"
+        >
+          Keep connected
+        </button>
+        <button
+          onClick={onConfirm}
+          disabled={isLoading}
+          className="flex-1 px-4 py-2 rounded-xl text-sm font-medium bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors disabled:opacity-50"
+        >
+          {isLoading ? 'Disconnecting…' : 'Yes, disconnect'}
+        </button>
+      </div>
+    </div>
+  </div>
+);
+
 const Settings: FC = () => {
   const [searchParams] = useSearchParams();
   const connected = searchParams.get('connected');
   const oauthError = searchParams.get('error');
   const { session } = useAuth();
+  const [disconnectTarget, setDisconnectTarget] = useState<SocialAccount | null>(null);
 
   const { data: accounts = [], isLoading } = useAccounts();
   const deleteAccount = useDeleteAccount();
@@ -74,6 +119,14 @@ const Settings: FC = () => {
   const connectPlatform = (oauthKey: 'meta' | 'linkedin') => {
     if (!session?.access_token) return;
     window.location.href = `${API}/auth/${oauthKey}?token=${session.access_token}`;
+  };
+
+  const handleDisconnectConfirm = () => {
+    if (!disconnectTarget) return;
+    deleteAccount.mutate(disconnectTarget.id, {
+      onSuccess: () => setDisconnectTarget(null),
+      onError: () => setDisconnectTarget(null),
+    });
   };
 
   const connectedPlatforms = new Set((accounts as SocialAccount[]).map((a) => a.platform));
@@ -213,11 +266,7 @@ const Settings: FC = () => {
                       </button>
 
                       <button
-                        onClick={() => {
-                          if (confirm(`Disconnect @${account.platform_username}?`)) {
-                            deleteAccount.mutate(account.id);
-                          }
-                        }}
+                        onClick={() => setDisconnectTarget(account)}
                         className="w-8 h-8 rounded-lg bg-white/5 hover:bg-red-500/10 text-zinc-500 hover:text-red-400 flex items-center justify-center transition-colors"
                         aria-label={`Disconnect ${account.platform_username}`}
                       >
@@ -231,6 +280,15 @@ const Settings: FC = () => {
           </div>
         </div>
       </main>
+
+      {disconnectTarget && (
+        <DisconnectModal
+          account={disconnectTarget}
+          onConfirm={handleDisconnectConfirm}
+          onCancel={() => setDisconnectTarget(null)}
+          isLoading={deleteAccount.isPending}
+        />
+      )}
     </div>
   );
 };

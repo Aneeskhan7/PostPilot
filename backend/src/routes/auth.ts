@@ -98,7 +98,7 @@ router.get('/meta/callback', async (req: Request, res: Response) => {
     // Exchange code → short-lived token → long-lived token
     const shortToken = await Meta.exchangeCodeForToken(code);
     const longLived = await Meta.getLongLivedToken(shortToken);
-    const expiresAt = new Date(Date.now() + longLived.expires_in * 1000).toISOString();
+    const expiresAt = new Date(Date.now() + (longLived.expires_in ?? 5184000) * 1000).toISOString();
     const encryptedUserToken = encrypt(longLived.access_token);
 
     // Always save the personal Facebook profile
@@ -199,7 +199,7 @@ router.get('/linkedin/callback', async (req: Request, res: Response) => {
     const tokenData = await LinkedIn.exchangeCodeForToken(code);
     const profile = await LinkedIn.getProfile(tokenData.access_token);
 
-    const expiresAt = new Date(Date.now() + tokenData.expires_in * 1000).toISOString();
+    const expiresAt = new Date(Date.now() + (tokenData.expires_in ?? 5184000) * 1000).toISOString();
     const encryptedToken = encrypt(tokenData.access_token);
 
     // Save personal LinkedIn profile
