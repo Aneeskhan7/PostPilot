@@ -37,7 +37,7 @@ app.use(compression());
 app.use((_req, res, next) => {
   const start = Date.now();
   res.on('finish', () => {
-    res.setHeader('x-response-time', `${Date.now() - start}ms`);
+    console.log(`[REQ] ${_req.method} ${_req.path} ${res.statusCode} ${Date.now() - start}ms`);
   });
   next();
 });
