@@ -161,6 +161,24 @@ router.get('/meta/callback', async (req: Request, res: Response) => {
       }
     }
 
+    // Fallback: try /me/instagram_accounts for accounts linked via Account Center
+    const igAccounts = await Meta.getUserInstagramAccounts(longLived.access_token);
+    for (const igAcc of igAccounts) {
+      const { error: igDirectErr } = await supabase.from('social_accounts').upsert({
+        user_id: userId,
+        platform: 'instagram',
+        platform_account_id: igAcc.id,
+        platform_username: igAcc.username,
+        platform_avatar_url: igAcc.profile_picture_url ?? null,
+        access_token: encryptedUserToken,
+        token_expires_at: expiresAt,
+        page_id: null,
+        page_name: null,
+        is_active: true,
+      }, { onConflict: 'user_id,platform,platform_account_id' });
+      if (igDirectErr) console.warn('[META] Failed to save fallback IG account:', igDirectErr.message);
+    }
+
     res.redirect(`${process.env.FRONTEND_URL}/settings?connected=meta`);
   } catch (err) {
     oauthError(res, err instanceof Error ? err.message : 'Meta connection failed');

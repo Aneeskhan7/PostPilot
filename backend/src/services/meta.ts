@@ -98,7 +98,7 @@ export function getOAuthUrl(state: string): string {
   url.searchParams.set('client_id', APP_ID);
   url.searchParams.set('redirect_uri', REDIRECT_URI);
   url.searchParams.set('state', state);
-  url.searchParams.set('scope', 'pages_show_list,pages_manage_posts,instagram_content_publish');
+  url.searchParams.set('scope', 'pages_show_list,pages_manage_posts,instagram_basic,instagram_content_publish');
   url.searchParams.set('auth_type', 'rerequest');
   return url.toString();
 }
