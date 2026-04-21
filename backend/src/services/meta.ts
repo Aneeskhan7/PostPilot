@@ -102,6 +102,7 @@ export function getOAuthUrl(state: string): string {
   url.searchParams.set('state', state);
   url.searchParams.set('scope', 'pages_show_list,pages_read_engagement,pages_manage_posts,instagram_content_publish,instagram_manage_insights');
   url.searchParams.set('auth_type', 'rerequest');
+  url.searchParams.set('enable_profile_selector', 'true');
   return url.toString();
 }
 

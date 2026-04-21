@@ -135,7 +135,7 @@ const Settings: FC = () => {
     connected === 'meta'
       ? connectedPlatforms.has('instagram')
         ? 'Facebook & Instagram connected successfully!'
-        : 'Facebook connected! Instagram will connect automatically once you link a Business or Creator account to your Facebook Page.'
+        : 'Facebook personal account connected, but no Pages were detected. To connect Instagram: disconnect Facebook below, click Connect Facebook again, and on the Facebook screen make sure to SELECT your Page (check the checkbox next to it) before clicking Continue.'
       : connected === 'instagram'
       ? 'Instagram connected successfully!'
       : connected === 'linkedin'
