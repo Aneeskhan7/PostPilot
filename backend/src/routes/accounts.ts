@@ -117,4 +117,57 @@ router.delete('/:id', requireAuth, async (req: Request, res: Response, next: Nex
   }
 });
 
+// GET /api/accounts/debug/instagram — shows raw Meta API response for Instagram detection
+router.get('/debug/instagram', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { data: fbAccount, error: fbErr } = await supabase
+      .from('social_accounts')
+      .select('access_token, platform_username')
+      .eq('user_id', req.user.id)
+      .eq('platform', 'facebook')
+      .is('page_id', null)
+      .single();
+
+    if (fbErr || !fbAccount) {
+      res.json({ error: 'No Facebook personal account found. Connect Facebook first.' });
+      return;
+    }
+
+    const { decrypt } = await import('../services/tokenManager');
+    const token = decrypt(fbAccount.access_token);
+
+    // Fetch pages with all Instagram fields
+    const pagesUrl = new URL('https://graph.facebook.com/v21.0/me/accounts');
+    pagesUrl.searchParams.set('access_token', token);
+    pagesUrl.searchParams.set('fields', 'id,name,access_token,instagram_business_account{id,username,profile_picture_url},connected_instagram_account{id,username,profile_picture_url},instagram_accounts{id,username,profile_picture_url}');
+
+    const pagesRes = await fetch(pagesUrl.toString());
+    const pagesJson = await pagesRes.json();
+
+    // Fetch direct Instagram accounts
+    const igUrl = new URL('https://graph.facebook.com/v21.0/me/instagram_accounts');
+    igUrl.searchParams.set('access_token', token);
+    igUrl.searchParams.set('fields', 'id,username,profile_picture_url');
+
+    const igRes = await fetch(igUrl.toString());
+    const igJson = await igRes.json();
+
+    // Fetch token debug info (scopes granted)
+    const debugUrl = new URL('https://graph.facebook.com/v21.0/debug_token');
+    debugUrl.searchParams.set('input_token', token);
+    debugUrl.searchParams.set('access_token', token);
+    const debugRes = await fetch(debugUrl.toString());
+    const debugJson = await debugRes.json();
+
+    res.json({
+      facebook_username: fbAccount.platform_username,
+      pages: pagesJson,
+      instagram_accounts: igJson,
+      token_debug: debugJson,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;

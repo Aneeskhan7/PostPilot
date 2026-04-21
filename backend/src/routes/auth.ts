@@ -94,7 +94,11 @@ router.get('/meta/callback', async (req: Request, res: Response) => {
     }
 
     const userId = consumeState(state);
-    await ensureProfile(userId);
+    try {
+      await ensureProfile(userId);
+    } catch (profileErr) {
+      console.error('[AUTH] ensureProfile failed (non-fatal):', profileErr instanceof Error ? profileErr.message : profileErr);
+    }
 
     // Exchange code → short-lived token → long-lived token
     const shortToken = await Meta.exchangeCodeForToken(code);
@@ -334,7 +338,11 @@ router.get('/linkedin/callback', async (req: Request, res: Response) => {
     }
 
     const userId = consumeState(state);
-    await ensureProfile(userId);
+    try {
+      await ensureProfile(userId);
+    } catch (profileErr) {
+      console.error('[AUTH] ensureProfile failed (non-fatal):', profileErr instanceof Error ? profileErr.message : profileErr);
+    }
 
     const tokenData = await LinkedIn.exchangeCodeForToken(code);
     const profile = await LinkedIn.getProfile(tokenData.access_token);

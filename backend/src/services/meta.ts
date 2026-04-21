@@ -100,7 +100,7 @@ export function getOAuthUrl(state: string): string {
   url.searchParams.set('client_id', APP_ID);
   url.searchParams.set('redirect_uri', REDIRECT_URI);
   url.searchParams.set('state', state);
-  url.searchParams.set('scope', 'pages_show_list,pages_read_engagement,pages_manage_posts,instagram_content_publish');
+  url.searchParams.set('scope', 'pages_show_list,pages_read_engagement,pages_manage_posts,instagram_content_publish,instagram_manage_content');
   url.searchParams.set('auth_type', 'rerequest');
   return url.toString();
 }
@@ -134,7 +134,8 @@ export async function getUserInstagramAccounts(userToken: string): Promise<Insta
       fields: 'id,username,profile_picture_url',
     });
     return data.data ?? [];
-  } catch {
+  } catch (err) {
+    console.warn('[META] getUserInstagramAccounts failed:', err instanceof Error ? err.message : err);
     return [];
   }
 }
@@ -164,7 +165,8 @@ export async function getPageInstagramAccounts(pageId: string, pageToken: string
       fields: 'id,username,profile_picture_url',
     });
     return data.data ?? [];
-  } catch {
+  } catch (err) {
+    console.warn('[META] getPageInstagramAccounts failed for page', pageId, ':', err instanceof Error ? err.message : err);
     return [];
   }
 }
@@ -179,7 +181,8 @@ export async function getPageWithInstagram(pageId: string, pageToken: string): P
       access_token: pageToken,
       fields: 'instagram_business_account{id,username,profile_picture_url},connected_instagram_account{id,username,profile_picture_url}',
     });
-  } catch {
+  } catch (err) {
+    console.warn('[META] getPageWithInstagram failed for page', pageId, ':', err instanceof Error ? err.message : err);
     return {};
   }
 }
