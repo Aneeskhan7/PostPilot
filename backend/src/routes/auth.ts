@@ -353,24 +353,35 @@ router.get('/meta/callback', async (req: Request, res: Response) => {
           }, { onConflict: 'user_id,platform,platform_account_id' });
           console.log('[META] Saved Facebook page via direct query:', pageData.name);
 
-          const igData = pageData.instagram_business_account ?? pageData.connected_instagram_account;
-          if (igData?.id) {
-            const igProfile = igData.username
-              ? (igData as { id: string; username: string; profile_picture_url?: string })
-              : await Meta.getInstagramAccount(igData.id, pageToken);
-            await supabase.from('social_accounts').upsert({
-              user_id: userId,
-              platform: 'instagram',
-              platform_account_id: igProfile.id,
-              platform_username: igProfile.username,
-              platform_avatar_url: igProfile.profile_picture_url ?? null,
-              access_token: encryptedPageToken,
-              token_expires_at: expiresAt,
-              page_id: pageData.id,
-              page_name: pageData.name,
-              is_active: true,
-            }, { onConflict: 'user_id,platform,platform_account_id' });
-            console.log('[META] Saved Instagram via direct page query:', igProfile.username);
+          // Collect all possible Instagram sources from the page response
+          const igCandidates = [
+            pageData.instagram_business_account,
+            pageData.connected_instagram_account,
+            ...(pageData.instagram_accounts?.data ?? []),
+          ].filter((a): a is { id: string; username?: string; profile_picture_url?: string } => !!a?.id);
+
+          for (const igData of igCandidates) {
+            try {
+              const igProfile = igData.username
+                ? (igData as { id: string; username: string; profile_picture_url?: string })
+                : await Meta.getInstagramAccount(igData.id, pageToken);
+              await supabase.from('social_accounts').upsert({
+                user_id: userId,
+                platform: 'instagram',
+                platform_account_id: igProfile.id,
+                platform_username: igProfile.username,
+                platform_avatar_url: igProfile.profile_picture_url ?? null,
+                access_token: encryptedPageToken,
+                token_expires_at: expiresAt,
+                page_id: pageData.id,
+                page_name: pageData.name,
+                is_active: true,
+              }, { onConflict: 'user_id,platform,platform_account_id' });
+              console.log('[META] Saved Instagram via direct page query:', igProfile.username);
+              break;
+            } catch (igErr) {
+              console.warn('[META] Page IG candidate failed:', igData.id, igErr instanceof Error ? igErr.message : igErr);
+            }
           }
         } catch (e) {
           console.warn('[META] Direct page query failed for', pageId, ':', e instanceof Error ? e.message : e);

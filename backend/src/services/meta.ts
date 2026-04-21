@@ -215,11 +215,12 @@ export async function getPageById(pageId: string, userToken: string): Promise<{
   access_token?: string;
   connected_instagram_account?: { id: string; username?: string; profile_picture_url?: string };
   instagram_business_account?: { id: string; username?: string; profile_picture_url?: string };
+  instagram_accounts?: { data: { id: string; username?: string; profile_picture_url?: string }[] };
 } | null> {
   try {
     return await metaGet(`/${pageId}`, {
       access_token: userToken,
-      fields: 'id,name,access_token,connected_instagram_account{id,username,profile_picture_url},instagram_business_account{id,username,profile_picture_url}',
+      fields: 'id,name,access_token,connected_instagram_account{id,username,profile_picture_url},instagram_business_account{id,username,profile_picture_url},instagram_accounts{id,username,profile_picture_url}',
     });
   } catch (err) {
     console.warn('[META] getPageById failed for page', pageId, ':', err instanceof Error ? err.message : err);
@@ -257,15 +258,41 @@ export async function getPageWithInstagram(pageId: string, pageToken: string): P
   }
 }
 
-// Get Instagram Business Account details linked to a Facebook Page
+// Get Instagram account details — tries multiple field combos since Creator accounts
+// may reject profile_picture_url or username depending on token type
 export async function getInstagramAccount(
   igAccountId: string,
-  pageToken: string
+  token: string
 ): Promise<InstagramAccount> {
-  return metaGet<InstagramAccount>(`/${igAccountId}`, {
-    access_token: pageToken,
-    fields: 'id,username,profile_picture_url',
-  });
+  // Try 1: full fields
+  try {
+    return await metaGet<InstagramAccount>(`/${igAccountId}`, {
+      access_token: token,
+      fields: 'id,username,profile_picture_url',
+    });
+  } catch {}
+  // Try 2: no avatar (profile_picture_url may be restricted)
+  try {
+    const data = await metaGet<{ id: string; username: string }>(`/${igAccountId}`, {
+      access_token: token,
+      fields: 'id,username',
+    });
+    return { id: data.id, username: data.username };
+  } catch {}
+  // Try 3: name field fallback (some Creator nodes return name instead of username)
+  try {
+    const data = await metaGet<{ id: string; name?: string; username?: string }>(`/${igAccountId}`, {
+      access_token: token,
+      fields: 'id,name,username',
+    });
+    return { id: data.id, username: data.username ?? data.name ?? `ig_${igAccountId}` };
+  } catch (err) {
+    throw new AppError(
+      `Could not read Instagram account ${igAccountId}: ${err instanceof Error ? err.message : String(err)}`,
+      502,
+      'META_API_ERROR'
+    );
+  }
 }
 
 // Publish a photo post to a Facebook Page
