@@ -302,22 +302,80 @@ router.get('/meta/callback', async (req: Request, res: Response) => {
       if (igDirectErr) console.warn('[META] Failed to save IG account (edge):', igDirectErr.message);
     }
 
-    // Fallback B: /me?fields=instagram_accounts (different path for Creator accounts)
-    const igViaFields = await Meta.getUserInstagramViaFields(longLived.access_token);
-    for (const igAcc of igViaFields) {
-      const { error: igFieldErr } = await supabase.from('social_accounts').upsert({
-        user_id: userId,
-        platform: 'instagram',
-        platform_account_id: igAcc.id,
-        platform_username: igAcc.username,
-        platform_avatar_url: igAcc.profile_picture_url ?? null,
-        access_token: encryptedUserToken,
-        token_expires_at: expiresAt,
-        page_id: null,
-        page_name: null,
-        is_active: true,
-      }, { onConflict: 'user_id,platform,platform_account_id' });
-      if (igFieldErr) console.warn('[META] Failed to save IG account (fields):', igFieldErr.message);
+    // Fallback B: use granular scopes from /debug_token to find IDs directly
+    // Handles Business Manager pages where /me/accounts returns empty
+    if (pages.length === 0) {
+      console.log('[META] /me/accounts empty — querying via granular scopes');
+      const { pageIds, instagramIds } = await Meta.getTokenGranularScopes(longLived.access_token);
+
+      // Save Instagram accounts directly (user token has instagram_content_publish for these IDs)
+      for (const igId of instagramIds) {
+        try {
+          const igAccount = await Meta.getInstagramAccount(igId, longLived.access_token);
+          const { error: igErr } = await supabase.from('social_accounts').upsert({
+            user_id: userId,
+            platform: 'instagram',
+            platform_account_id: igAccount.id,
+            platform_username: igAccount.username,
+            platform_avatar_url: igAccount.profile_picture_url ?? null,
+            access_token: encryptedUserToken,
+            token_expires_at: expiresAt,
+            page_id: null,
+            page_name: null,
+            is_active: true,
+          }, { onConflict: 'user_id,platform,platform_account_id' });
+          if (igErr) console.warn('[META] Failed to save IG via scope:', igErr.message);
+          else console.log('[META] Saved Instagram via granular scope:', igAccount.username);
+        } catch (e) {
+          console.warn('[META] Direct IG query failed for', igId, ':', e instanceof Error ? e.message : e);
+        }
+      }
+
+      // Query each page directly and save with its Instagram connection
+      for (const pageId of pageIds) {
+        try {
+          const pageData = await Meta.getPageById(pageId, longLived.access_token);
+          if (!pageData) continue;
+
+          const pageToken = pageData.access_token ?? longLived.access_token;
+          const encryptedPageToken = encrypt(pageToken);
+
+          await supabase.from('social_accounts').upsert({
+            user_id: userId,
+            platform: 'facebook',
+            platform_account_id: pageData.id,
+            platform_username: pageData.name,
+            access_token: encryptedPageToken,
+            token_expires_at: expiresAt,
+            page_id: pageData.id,
+            page_name: pageData.name,
+            is_active: true,
+          }, { onConflict: 'user_id,platform,platform_account_id' });
+          console.log('[META] Saved Facebook page via direct query:', pageData.name);
+
+          const igData = pageData.instagram_business_account ?? pageData.connected_instagram_account;
+          if (igData?.id) {
+            const igProfile = igData.username
+              ? (igData as { id: string; username: string; profile_picture_url?: string })
+              : await Meta.getInstagramAccount(igData.id, pageToken);
+            await supabase.from('social_accounts').upsert({
+              user_id: userId,
+              platform: 'instagram',
+              platform_account_id: igProfile.id,
+              platform_username: igProfile.username,
+              platform_avatar_url: igProfile.profile_picture_url ?? null,
+              access_token: encryptedPageToken,
+              token_expires_at: expiresAt,
+              page_id: pageData.id,
+              page_name: pageData.name,
+              is_active: true,
+            }, { onConflict: 'user_id,platform,platform_account_id' });
+            console.log('[META] Saved Instagram via direct page query:', igProfile.username);
+          }
+        } catch (e) {
+          console.warn('[META] Direct page query failed for', pageId, ':', e instanceof Error ? e.message : e);
+        }
+      }
     }
 
     // Invalidate accounts cache so fresh data is fetched after OAuth

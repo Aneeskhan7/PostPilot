@@ -176,6 +176,57 @@ export async function getUserPages(userToken: string): Promise<PageAccount[]> {
   return data.data;
 }
 
+// Get page and Instagram IDs from token's granular scopes via /debug_token
+// Used when /me/accounts returns empty (e.g. Business Manager pages)
+export async function getTokenGranularScopes(userToken: string): Promise<{
+  pageIds: string[];
+  instagramIds: string[];
+}> {
+  try {
+    const appToken = `${APP_ID}|${APP_SECRET}`;
+    const data = await metaGet<{
+      data?: { granular_scopes?: { scope: string; target_ids?: string[] }[] };
+    }>('/debug_token', {
+      input_token: userToken,
+      access_token: appToken,
+    });
+    const scopes = data.data?.granular_scopes ?? [];
+    const pageIds = [...new Set(
+      scopes.filter(s => s.scope === 'pages_show_list' || s.scope === 'pages_manage_posts')
+        .flatMap(s => s.target_ids ?? [])
+    )];
+    const instagramIds = [...new Set(
+      scopes.filter(s => s.scope === 'instagram_content_publish')
+        .flatMap(s => s.target_ids ?? [])
+    )];
+    console.log('[META] Granular scopes — pageIds:', pageIds, 'instagramIds:', instagramIds);
+    return { pageIds, instagramIds };
+  } catch (err) {
+    console.warn('[META] getTokenGranularScopes failed:', err instanceof Error ? err.message : err);
+    return { pageIds: [], instagramIds: [] };
+  }
+}
+
+// Query a Facebook Page directly by ID with page-level fields
+// Works even when /me/accounts returns empty (Business Manager pages)
+export async function getPageById(pageId: string, userToken: string): Promise<{
+  id: string;
+  name: string;
+  access_token?: string;
+  connected_instagram_account?: { id: string; username?: string; profile_picture_url?: string };
+  instagram_business_account?: { id: string; username?: string; profile_picture_url?: string };
+} | null> {
+  try {
+    return await metaGet(`/${pageId}`, {
+      access_token: userToken,
+      fields: 'id,name,access_token,connected_instagram_account{id,username,profile_picture_url},instagram_business_account{id,username,profile_picture_url}',
+    });
+  } catch (err) {
+    console.warn('[META] getPageById failed for page', pageId, ':', err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
 // Get Instagram accounts connected to a Facebook Page via /instagram_accounts edge
 export async function getPageInstagramAccounts(pageId: string, pageToken: string): Promise<InstagramAccount[]> {
   try {
