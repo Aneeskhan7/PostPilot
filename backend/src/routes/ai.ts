@@ -7,7 +7,11 @@ import { AppError } from '../middleware/errorHandler';
 
 const router = Router();
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+let _groq: Groq | null = null;
+function getGroq(): Groq {
+  if (!_groq) _groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+  return _groq;
+}
 
 const GenerateSchema = z.object({
   topic: z.string().min(1, 'Topic is required').max(500),
@@ -69,7 +73,7 @@ ${PLATFORM_RULES[body.platform]}
 
 IMPORTANT: Use real blank lines between sections. Return only the post text — no explanations, no quotes, no preamble.`;
 
-    const completion = await groq.chat.completions.create({
+    const completion = await getGroq().chat.completions.create({
       model: 'llama-3.3-70b-versatile',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.7,
@@ -110,7 +114,7 @@ ${body.caption}
 
 Return only the improved caption — no explanations, no quotes, no preamble.`;
 
-    const completion = await groq.chat.completions.create({
+    const completion = await getGroq().chat.completions.create({
       model: 'llama-3.3-70b-versatile',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.7,
