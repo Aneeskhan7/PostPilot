@@ -353,11 +353,12 @@ router.get('/meta/callback', async (req: Request, res: Response) => {
           }, { onConflict: 'user_id,platform,platform_account_id' });
           console.log('[META] Saved Facebook page via direct query:', pageData.name);
 
-          // Collect all possible Instagram sources from the page response
+          // Collect Instagram sources: page fields + instagram_accounts edge
+          const edgeAccounts = await Meta.getPageInstagramAccounts(pageData.id, pageToken);
           const igCandidates = [
             pageData.instagram_business_account,
             pageData.connected_instagram_account,
-            ...(pageData.instagram_accounts?.data ?? []),
+            ...edgeAccounts,
           ].filter((a): a is { id: string; username?: string; profile_picture_url?: string } => !!a?.id);
 
           for (const igData of igCandidates) {

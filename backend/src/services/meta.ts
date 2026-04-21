@@ -215,12 +215,11 @@ export async function getPageById(pageId: string, userToken: string): Promise<{
   access_token?: string;
   connected_instagram_account?: { id: string; username?: string; profile_picture_url?: string };
   instagram_business_account?: { id: string; username?: string; profile_picture_url?: string };
-  instagram_accounts?: { data: { id: string; username?: string; profile_picture_url?: string }[] };
 } | null> {
   try {
     return await metaGet(`/${pageId}`, {
       access_token: userToken,
-      fields: 'id,name,access_token,connected_instagram_account{id,username,profile_picture_url},instagram_business_account{id,username,profile_picture_url},instagram_accounts{id,username,profile_picture_url}',
+      fields: 'id,name,access_token,connected_instagram_account{id,username,profile_picture_url},instagram_business_account{id,username,profile_picture_url}',
     });
   } catch (err) {
     console.warn('[META] getPageById failed for page', pageId, ':', err instanceof Error ? err.message : err);
