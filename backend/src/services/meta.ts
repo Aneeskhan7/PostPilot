@@ -23,7 +23,7 @@ interface PageAccount {
   id: string;
   name: string;
   access_token: string;
-  instagram_business_account?: { id: string };
+  instagram_business_account?: { id: string; username?: string; profile_picture_url?: string };
 }
 
 interface InstagramAccount {
@@ -145,13 +145,26 @@ export async function getPersonalProfile(userToken: string): Promise<PersonalPro
   });
 }
 
-// Get all Facebook Pages the user manages
+// Get all Facebook Pages the user manages, with nested Instagram data
 export async function getUserPages(userToken: string): Promise<PageAccount[]> {
   const data = await metaGet<{ data: PageAccount[] }>('/me/accounts', {
     access_token: userToken,
-    fields: 'id,name,access_token,instagram_business_account',
+    fields: 'id,name,access_token,instagram_business_account{id,username,profile_picture_url}',
   });
   return data.data;
+}
+
+// Get Instagram accounts connected to a Facebook Page
+export async function getPageInstagramAccounts(pageId: string, pageToken: string): Promise<InstagramAccount[]> {
+  try {
+    const data = await metaGet<{ data: InstagramAccount[] }>(`/${pageId}/instagram_accounts`, {
+      access_token: pageToken,
+      fields: 'id,username,profile_picture_url',
+    });
+    return data.data ?? [];
+  } catch {
+    return [];
+  }
 }
 
 // Get Instagram Business Account details linked to a Facebook Page

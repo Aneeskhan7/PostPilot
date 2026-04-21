@@ -136,13 +136,15 @@ router.get('/meta/callback', async (req: Request, res: Response) => {
       }, { onConflict: 'user_id,platform,platform_account_id' });
       if (fbErr) throw new Error(fbErr.message);
 
+      // Try to save Instagram — check nested data first, then fetch, then page fallback
+      let igSaved = false;
       if (page.instagram_business_account?.id) {
         try {
-          const igAccount = await Meta.getInstagramAccount(
-            page.instagram_business_account.id,
-            page.access_token
-          );
-          const { error: igErr } = await supabase.from('social_accounts').upsert({
+          const nested = page.instagram_business_account;
+          const igAccount = nested.username
+            ? nested as { id: string; username: string; profile_picture_url?: string }
+            : await Meta.getInstagramAccount(nested.id, page.access_token);
+          await supabase.from('social_accounts').upsert({
             user_id: userId,
             platform: 'instagram',
             platform_account_id: igAccount.id,
@@ -154,9 +156,31 @@ router.get('/meta/callback', async (req: Request, res: Response) => {
             page_name: page.name,
             is_active: true,
           }, { onConflict: 'user_id,platform,platform_account_id' });
-          if (igErr) throw new Error(igErr.message);
-        } catch {
-          console.warn(`[META] No Instagram account for page ${page.id}`);
+          igSaved = true;
+          console.log(`[META] Saved Instagram account ${igAccount.username} via business account`);
+        } catch (e) {
+          console.warn(`[META] instagram_business_account fetch failed for page ${page.id}:`, e instanceof Error ? e.message : e);
+        }
+      }
+
+      if (!igSaved) {
+        // Fallback: /{page-id}/instagram_accounts
+        const pageIgAccounts = await Meta.getPageInstagramAccounts(page.id, page.access_token);
+        for (const igAcc of pageIgAccounts) {
+          await supabase.from('social_accounts').upsert({
+            user_id: userId,
+            platform: 'instagram',
+            platform_account_id: igAcc.id,
+            platform_username: igAcc.username,
+            platform_avatar_url: igAcc.profile_picture_url ?? null,
+            access_token: encryptedPageToken,
+            token_expires_at: expiresAt,
+            page_id: page.id,
+            page_name: page.name,
+            is_active: true,
+          }, { onConflict: 'user_id,platform,platform_account_id' });
+          console.log(`[META] Saved Instagram account ${igAcc.username} via page instagram_accounts`);
+          igSaved = true;
         }
       }
     }
