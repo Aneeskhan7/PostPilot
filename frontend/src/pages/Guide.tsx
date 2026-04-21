@@ -37,7 +37,7 @@ const Section: FC<SectionProps> = ({ icon: Icon, title, children, accent = 'text
 const Guide: FC = () => (
   <div className="flex min-h-screen bg-zinc-950">
     <Sidebar />
-    <main className="flex-1 ml-60 p-8 max-w-3xl space-y-6">
+    <main className="flex-1 ml-60 p-8"><div className="max-w-5xl mx-auto space-y-6">
       <div className="mb-2">
         <h1 className="text-2xl font-bold text-white">Getting Started Guide</h1>
         <p className="text-sm text-zinc-400 mt-1">Everything you need to connect accounts and start scheduling</p>
@@ -170,7 +170,7 @@ const Guide: FC = () => (
           ))}
         </div>
       </Section>
-    </main>
+    </div></main>
   </div>
 );
 

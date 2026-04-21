@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useAuthStore } from '../store/authStore';
+import { supabase } from '../lib/supabase';
 
 const SignInSchema = z.object({
   email: z.string().email('Enter a valid email'),
@@ -22,15 +23,22 @@ const SignUpSchema = SignInSchema.extend({
 type SignInData = z.infer<typeof SignInSchema>;
 type SignUpData = z.infer<typeof SignUpSchema>;
 
+const ForgotSchema = z.object({
+  email: z.string().email('Enter a valid email'),
+});
+type ForgotData = z.infer<typeof ForgotSchema>;
+
 const Login: FC = () => {
-  const { user, signInWithEmail, signUpWithEmail } = useAuthStore();
-  const [tab, setTab] = useState<'signin' | 'signup'>('signin');
+  const { user, isAdmin, signInWithEmail, signUpWithEmail } = useAuthStore();
+  const [tab, setTab] = useState<'signin' | 'signup' | 'forgot'>('signin');
   const [serverError, setServerError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
   const signInForm = useForm<SignInData>({ resolver: zodResolver(SignInSchema) });
   const signUpForm = useForm<SignUpData>({ resolver: zodResolver(SignUpSchema) });
+  const forgotForm = useForm<ForgotData>({ resolver: zodResolver(ForgotSchema) });
 
+  if (user && isAdmin) return <Navigate to="/admin" replace />;
   if (user) return <Navigate to="/" replace />;
 
   const handleSignIn = async (data: SignInData) => {
@@ -51,6 +59,20 @@ const Login: FC = () => {
       signUpForm.reset();
     } catch (err) {
       setServerError(err instanceof Error ? err.message : 'Sign up failed');
+    }
+  };
+
+  const handleForgot = async (data: ForgotData) => {
+    setServerError('');
+    setSuccessMsg('');
+    const { error } = await supabase.auth.resetPasswordForEmail(data.email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    if (error) {
+      setServerError(error.message);
+    } else {
+      setSuccessMsg('Check your email for a password reset link.');
+      forgotForm.reset();
     }
   };
 
@@ -86,7 +108,7 @@ const Login: FC = () => {
                 key={t}
                 onClick={() => { setTab(t); setServerError(''); setSuccessMsg(''); }}
                 className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${
-                  tab === t
+                  tab === t || (tab === 'forgot' && t === 'signin')
                     ? 'bg-violet-600 text-white shadow-lg shadow-violet-600/25'
                     : 'text-zinc-400 hover:text-white'
                 }`}
@@ -129,9 +151,18 @@ const Login: FC = () => {
               </div>
 
               <div>
-                <label htmlFor="si-password" className="block text-sm font-medium text-zinc-300 mb-1.5">
-                  Password
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label htmlFor="si-password" className="block text-sm font-medium text-zinc-300">
+                    Password
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => { setTab('forgot'); setServerError(''); setSuccessMsg(''); }}
+                    className="text-xs text-violet-400 hover:text-violet-300 transition-colors"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
                 <input
                   id="si-password"
                   type="password"
@@ -151,6 +182,47 @@ const Login: FC = () => {
                 className="w-full py-2.5 px-4 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl transition-colors shadow-lg shadow-violet-600/25"
               >
                 {signInForm.formState.isSubmitting ? 'Signing in…' : 'Sign In'}
+              </button>
+            </form>
+          )}
+
+          {/* Forgot Password Form */}
+          {tab === 'forgot' && (
+            <form onSubmit={forgotForm.handleSubmit(handleForgot)} className="space-y-5" noValidate>
+              <div>
+                <p className="text-sm text-zinc-400 mb-4">
+                  Enter your email and we'll send you a link to reset your password.
+                </p>
+                <label htmlFor="fp-email" className="block text-sm font-medium text-zinc-300 mb-1.5">
+                  Email
+                </label>
+                <input
+                  id="fp-email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="you@example.com"
+                  {...forgotForm.register('email')}
+                  className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder-zinc-500 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition"
+                />
+                {forgotForm.formState.errors.email && (
+                  <p className="mt-1.5 text-xs text-red-400">{forgotForm.formState.errors.email.message}</p>
+                )}
+              </div>
+
+              <button
+                type="submit"
+                disabled={forgotForm.formState.isSubmitting}
+                className="w-full py-2.5 px-4 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl transition-colors shadow-lg shadow-violet-600/25"
+              >
+                {forgotForm.formState.isSubmitting ? 'Sending…' : 'Send Reset Link'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setTab('signin'); setServerError(''); setSuccessMsg(''); }}
+                className="w-full text-sm text-zinc-400 hover:text-white transition-colors"
+              >
+                Back to Sign In
               </button>
             </form>
           )}

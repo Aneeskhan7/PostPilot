@@ -41,8 +41,9 @@ async function enforcePlanLimit(userId: string): Promise<void> {
   if (!profile) throw new AppError('Profile not found', 404, 'NOT_FOUND');
 
   const now = new Date();
-  const resetAt = new Date(profile.daily_reset_at);
-  const effectiveCount = now > resetAt ? 0 : profile.daily_post_count;
+  const resetAt = profile.daily_reset_at ? new Date(profile.daily_reset_at) : new Date(0);
+  const rawCount = profile.daily_post_count ?? 0;
+  const effectiveCount = now > resetAt ? 0 : rawCount;
 
   const limit = PLAN_DAILY_LIMITS[profile.plan];
   if (limit !== null && effectiveCount >= limit) {
@@ -102,6 +103,10 @@ router.post('/', requireAuth, async (req: Request, res: Response, next: NextFunc
   try {
     const body = CreatePostSchema.parse(req.body);
     await enforcePlanLimit(req.user.id);
+
+    if (body.scheduled_at && new Date(body.scheduled_at) <= new Date()) {
+      throw new AppError('scheduled_at must be in the future', 400, 'VALIDATION_ERROR');
+    }
 
     const status = body.scheduled_at ? 'scheduled' : 'draft';
 

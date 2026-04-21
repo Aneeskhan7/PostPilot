@@ -19,12 +19,18 @@ export function encrypt(plaintext: string): string {
 }
 
 export function decrypt(ciphertext: string): string {
-  const key = getKey();
-  const [ivHex, authTagHex, encryptedHex] = ciphertext.split(':');
-  const iv = Buffer.from(ivHex, 'hex');
-  const authTag = Buffer.from(authTagHex, 'hex');
-  const encrypted = Buffer.from(encryptedHex, 'hex');
-  const decipher = crypto.createDecipheriv(ALGO, key, iv);
-  decipher.setAuthTag(authTag);
-  return decipher.update(encrypted).toString('utf8') + decipher.final('utf8');
+  try {
+    const key = getKey();
+    const parts = ciphertext.split(':');
+    if (parts.length !== 3) throw new Error('Invalid ciphertext format');
+    const [ivHex, authTagHex, encryptedHex] = parts;
+    const iv = Buffer.from(ivHex, 'hex');
+    const authTag = Buffer.from(authTagHex, 'hex');
+    const encrypted = Buffer.from(encryptedHex, 'hex');
+    const decipher = crypto.createDecipheriv(ALGO, key, iv);
+    decipher.setAuthTag(authTag);
+    return decipher.update(encrypted).toString('utf8') + decipher.final('utf8');
+  } catch (err) {
+    throw new Error(`Token decryption failed: ${err instanceof Error ? err.message : 'unknown error'}`);
+  }
 }

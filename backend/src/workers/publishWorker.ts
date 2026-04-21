@@ -101,17 +101,20 @@ async function publishToLinkedIn(
   mediaUrls: string[]
 ): Promise<string> {
   const accessToken = decrypt(account.access_token);
-  const personUrn = account.platform_account_id;
+  const rawId = account.platform_account_id;
+  const authorUrn = rawId.startsWith('org_')
+    ? `urn:li:organization:${rawId.replace('org_', '')}`
+    : `urn:li:person:${rawId}`;
 
   if (mediaUrls.length === 0) {
-    return LinkedIn.publishPost(personUrn, accessToken, content);
+    return LinkedIn.publishPost(authorUrn, accessToken, content);
   }
 
   // Upload images to LinkedIn first, collect asset URNs
   const assetUrns: string[] = [];
 
   for (const imageUrl of mediaUrls) {
-    const { uploadUrl, asset } = await LinkedIn.registerImageUpload(personUrn, accessToken);
+    const { uploadUrl, asset } = await LinkedIn.registerImageUpload(authorUrn, accessToken);
 
     const imageRes = await fetch(imageUrl);
     if (!imageRes.ok) throw new Error(`Failed to fetch image: ${imageUrl}`);
@@ -121,7 +124,7 @@ async function publishToLinkedIn(
     assetUrns.push(asset);
   }
 
-  return LinkedIn.publishPost(personUrn, accessToken, content, assetUrns);
+  return LinkedIn.publishPost(authorUrn, accessToken, content, assetUrns);
 }
 
 async function processJob(job: Job<PublishJobData>): Promise<void> {

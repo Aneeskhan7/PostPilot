@@ -67,18 +67,6 @@ function oauthError(res: Response, message: string): void {
   res.redirect(url.toString());
 }
 
-// GET /auth/meta/debug-pages — temporarily dump what /me/accounts returns
-router.get('/meta/debug-pages', async (req: Request, res: Response) => {
-  try {
-    const token = req.query.token as string;
-    if (!token) return res.status(400).json({ error: 'provide ?token=<user_access_token>' });
-    const pages = await Meta.getUserPages(token);
-    res.json({ pages });
-  } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
-  }
-});
-
 // GET /auth/meta — redirect user to Facebook OAuth
 // Accepts token via Authorization header OR ?token= query param (browser redirect)
 router.get('/meta', async (req: Request, res: Response) => {

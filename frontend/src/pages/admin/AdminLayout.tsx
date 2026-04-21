@@ -1,12 +1,18 @@
 // frontend/src/pages/admin/AdminLayout.tsx
 import { FC } from 'react';
-import { Outlet, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, ArrowLeft } from 'lucide-react';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
+import { LayoutDashboard, Users, ArrowLeft, LogOut } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 
 const AdminLayout: FC = () => {
-  const { user } = useAuthStore();
+  const { user, signOut } = useAuthStore();
   const { pathname } = useLocation();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/login', { replace: true });
+  };
 
   const navItems = [
     { to: '/admin', label: 'Dashboard', icon: LayoutDashboard },
@@ -48,6 +54,13 @@ const AdminLayout: FC = () => {
             <ArrowLeft className="w-4 h-4" />
             Back to App
           </Link>
+          <button
+            onClick={handleSignOut}
+            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors w-full mt-1"
+          >
+            <LogOut className="w-4 h-4" />
+            Sign Out
+          </button>
           <p className="px-3 mt-2 text-xs text-zinc-600 truncate">{user?.email}</p>
         </div>
       </aside>

@@ -38,7 +38,7 @@ const Calendar: FC = () => {
 
   const postsByDate = (posts as Post[]).reduce<Record<string, Post[]>>((acc: Record<string, Post[]>, post: Post) => {
     const dateStr = post.scheduled_at ?? post.published_at ?? post.created_at;
-    const key = dateStr.slice(0, 10);
+    const key = new Date(dateStr).toLocaleDateString('en-CA');
     if (!acc[key]) acc[key] = [];
     acc[key].push(post);
     return acc;

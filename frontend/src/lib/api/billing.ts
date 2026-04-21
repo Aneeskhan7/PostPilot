@@ -35,3 +35,24 @@ export async function createPortalSession(token: string): Promise<string> {
   const json = (await res.json()) as { data: { url: string } };
   return json.data.url;
 }
+
+export interface SubscriptionDetails {
+  plan: string;
+  subscription: {
+    id: string;
+    status: string;
+    current_period_end: number;
+    cancel_at_period_end: boolean;
+    payment_method: { brand: string; last4: string; exp_month: number; exp_year: number } | null;
+  } | null;
+}
+
+export async function fetchSubscription(token: string): Promise<SubscriptionDetails> {
+  const res = await authFetch(`${API}/api/billing/subscription`, token);
+  const json = (await res.json()) as { data: SubscriptionDetails };
+  return json.data;
+}
+
+export async function cancelSubscription(token: string): Promise<void> {
+  await authFetch(`${API}/api/billing/cancel`, token, { method: 'POST' });
+}

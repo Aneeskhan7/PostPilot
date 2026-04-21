@@ -74,7 +74,7 @@ describe('Posts Routes', () => {
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
             single: vi.fn().mockResolvedValue({
-              data: { plan: 'free', monthly_post_count: 5 },
+              data: { plan: 'free', daily_post_count: 0, daily_reset_at: new Date(Date.now() + 86400000).toISOString() },
               error: null,
             }),
           }),
@@ -128,7 +128,7 @@ describe('Posts Routes', () => {
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
             single: vi.fn().mockResolvedValue({
-              data: { plan: 'free', monthly_post_count: 10 },
+              data: { plan: 'free', daily_post_count: 10, daily_reset_at: new Date(Date.now() + 86400000).toISOString() },
               error: null,
             }),
           }),
@@ -145,14 +145,14 @@ describe('Posts Routes', () => {
     });
 
     it('schedules post when scheduled_at provided', async () => {
-      const futureDate = '2024-04-20T12:00:00.000Z';
+      const futureDate = '2099-04-20T12:00:00.000Z';
 
       // Mock free plan check
       mockSupabase.from.mockReturnValueOnce({
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
             single: vi.fn().mockResolvedValue({
-              data: { plan: 'free', monthly_post_count: 5 },
+              data: { plan: 'free', daily_post_count: 0, daily_reset_at: new Date(Date.now() + 86400000).toISOString() },
               error: null,
             }),
           }),

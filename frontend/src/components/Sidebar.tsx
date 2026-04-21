@@ -11,6 +11,7 @@ import {
   Rocket,
   BookOpen,
   ShieldCheck,
+  CreditCard,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useAuthStore } from '../store/authStore';
@@ -34,6 +35,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/calendar',  icon: ({ className }) => <CalendarDays className={className} />,   label: 'Calendar'  },
   { to: '/history',   icon: ({ className }) => <History className={className} />,        label: 'History'   },
   { to: '/guide',     icon: ({ className }) => <BookOpen className={className} />,       label: 'Guide'     },
+  { to: '/billing',   icon: ({ className }) => <CreditCard className={className} />,     label: 'Billing'   },
   { to: '/settings',  icon: ({ className }) => <Settings className={className} />,       label: 'Settings'  },
 ];
 

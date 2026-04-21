@@ -13,6 +13,12 @@ process.env.META_APP_ID = 'test-meta-id';
 process.env.META_APP_SECRET = 'test-meta-secret';
 process.env.REDIS_URL = 'redis://localhost:6379';
 process.env.TOKEN_ENCRYPTION_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+process.env.STRIPE_SECRET_KEY = 'sk_test_placeholder';
+process.env.STRIPE_WEBHOOK_SECRET = 'whsec_placeholder';
+process.env.STRIPE_PRO_PRICE_ID = 'price_test_pro';
+process.env.STRIPE_UNLIMITED_PRICE_ID = 'price_test_unlimited';
+process.env.META_REDIRECT_URI = 'http://localhost:4000/auth/meta/callback';
+process.env.LINKEDIN_REDIRECT_URI = 'http://localhost:4000/auth/linkedin/callback';
 
 // Global test helpers
 export const createMockSupabase = (overrides: any = {}) => ({

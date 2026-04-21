@@ -37,7 +37,7 @@ describe('usePosts hook', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUseAuth.mockReturnValue({
-      getAccessToken: vi.fn().mockReturnValue('mock-token'),
+      getToken: vi.fn().mockResolvedValue('mock-token'),
     });
   });
 
@@ -59,16 +59,16 @@ describe('usePosts hook', () => {
       expect(mockPostsApi.fetchPosts).toHaveBeenCalledWith('mock-token', undefined);
     });
 
-    it('is disabled when no access token', () => {
+    it('errors when no access token', async () => {
       mockUseAuth.mockReturnValue({
-        getAccessToken: vi.fn().mockReturnValue(null),
+        getToken: vi.fn().mockResolvedValue(null),
       });
 
       const { result } = renderHook(() => usePosts(), {
         wrapper: createWrapper(),
       });
 
-      expect(result.current.isIdle).toBe(true);
+      await waitFor(() => expect(result.current.isError).toBe(true));
       expect(mockPostsApi.fetchPosts).not.toHaveBeenCalled();
     });
 

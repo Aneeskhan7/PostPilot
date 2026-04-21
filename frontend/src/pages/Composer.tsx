@@ -111,12 +111,16 @@ const Composer: FC = () => {
 
   const onSubmit = async (data: FormData, publish: boolean) => {
     setServerError('');
+    if (publish && !data.scheduled_at) {
+      setServerError('Please select a schedule date and time before publishing.');
+      return;
+    }
     try {
       await createPost.mutateAsync({
         content: data.content,
         platforms: data.platforms,
         media_urls: data.media_urls,
-        scheduled_at: !publish && data.scheduled_at ? data.scheduled_at : undefined,
+        scheduled_at: publish && data.scheduled_at ? new Date(data.scheduled_at).toISOString() : undefined,
       });
       navigate('/');
     } catch (err) {
@@ -132,8 +136,8 @@ const Composer: FC = () => {
 
       <div className="flex-1 ml-60 flex">
         {/* Editor panel */}
-        <div className="flex-1 p-8 overflow-y-auto">
-          <div className="max-w-2xl">
+        <div className="flex-1 p-6 overflow-y-auto">
+          <div className="max-w-2xl mx-auto">
             <h1 className="text-2xl font-bold text-white mb-1">
               {editId ? 'Edit Post' : 'New Post'}
             </h1>
@@ -292,7 +296,7 @@ const Composer: FC = () => {
               {/* Schedule */}
               <div>
                 <label htmlFor="scheduled_at" className="block text-sm font-medium text-zinc-300 mb-2">
-                  Schedule (optional)
+                  Schedule <span className="text-zinc-500 font-normal text-xs">(required to publish)</span>
                 </label>
                 <div className="relative">
                   <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" />
@@ -300,9 +304,14 @@ const Composer: FC = () => {
                     id="scheduled_at"
                     type="datetime-local"
                     {...register('scheduled_at')}
-                    className="w-full pl-10 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition [color-scheme:dark]"
+                    className={`w-full pl-10 pr-4 py-2.5 bg-white/5 border rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition [color-scheme:dark] ${
+                      errors.scheduled_at ? 'border-red-500/50' : 'border-white/10'
+                    }`}
                   />
                 </div>
+                {errors.scheduled_at && (
+                  <p className="mt-1 text-xs text-red-400">{errors.scheduled_at.message}</p>
+                )}
               </div>
 
               {serverError && (
@@ -336,7 +345,7 @@ const Composer: FC = () => {
         </div>
 
         {/* Preview panel */}
-        <div className="w-80 border-l border-white/5 p-6 flex flex-col gap-4 overflow-y-auto">
+        <div className="w-96 border-l border-white/5 p-5 flex flex-col gap-4 overflow-y-auto">
           <div>
             <p className="text-sm font-medium text-zinc-300 mb-3">Preview</p>
             <div className="flex gap-2">

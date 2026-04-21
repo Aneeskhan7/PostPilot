@@ -188,13 +188,13 @@ export async function getProfile(accessToken: string): Promise<LinkedInProfile> 
 
 // Step 1: Register an image upload with LinkedIn, get an upload URL + asset URN
 export async function registerImageUpload(
-  personUrn: string,
+  authorUrn: string,
   accessToken: string
 ): Promise<{ uploadUrl: string; asset: string }> {
   const body = {
     registerUploadRequest: {
       recipes: ['urn:li:digitalmediaRecipe:feedshare-image'],
-      owner: `urn:li:person:${personUrn}`,
+      owner: authorUrn,
       serviceRelationships: [
         {
           relationshipType: 'OWNER',
@@ -241,7 +241,7 @@ export async function uploadImageBinary(
 
 // Publish a text or image post to LinkedIn
 export async function publishPost(
-  personUrn: string,
+  authorUrn: string,
   accessToken: string,
   text: string,
   assetUrns: string[] = []
@@ -254,7 +254,7 @@ export async function publishPost(
   }));
 
   const body = {
-    author: `urn:li:person:${personUrn}`,
+    author: authorUrn,
     lifecycleState: 'PUBLISHED',
     specificContent: {
       'com.linkedin.ugc.ShareContent': {

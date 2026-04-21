@@ -17,6 +17,8 @@ const required = [
   'STRIPE_WEBHOOK_SECRET',
   'STRIPE_PRO_PRICE_ID',
   'STRIPE_UNLIMITED_PRICE_ID',
+  'META_REDIRECT_URI',
+  'LINKEDIN_REDIRECT_URI',
 ];
 for (const key of required) {
   if (!process.env[key]) throw new Error(`Missing env var: ${key}`);

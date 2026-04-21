@@ -5,23 +5,29 @@ import { QUERY_KEYS } from '../lib/queryKeys';
 import * as accountsApi from '../lib/api/accounts';
 
 export function useAccounts() {
-  const { getAccessToken } = useAuth();
+  const { getToken } = useAuth();
 
   return useQuery({
     queryKey: QUERY_KEYS.accounts,
-    queryFn: () => accountsApi.fetchAccounts(getAccessToken()!),
-    enabled: !!getAccessToken(),
+    queryFn: async () => {
+      const token = await getToken();
+      if (!token) throw new Error('Not authenticated');
+      return accountsApi.fetchAccounts(token);
+    },
     staleTime: 1000 * 60,
   });
 }
 
 export function useToggleAccount() {
-  const { getAccessToken } = useAuth();
+  const { getToken } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
-      accountsApi.toggleAccount(getAccessToken()!, id, isActive),
+    mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
+      const token = await getToken();
+      if (!token) throw new Error('Not authenticated');
+      return accountsApi.toggleAccount(token, id, isActive);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.accounts });
     },
@@ -29,11 +35,15 @@ export function useToggleAccount() {
 }
 
 export function useDeleteAccount() {
-  const { getAccessToken } = useAuth();
+  const { getToken } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: string) => accountsApi.deleteAccount(getAccessToken()!, id),
+    mutationFn: async (id: string) => {
+      const token = await getToken();
+      if (!token) throw new Error('Not authenticated');
+      return accountsApi.deleteAccount(token, id);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.accounts });
     },

@@ -7,6 +7,10 @@ import { AppError } from '../middleware/errorHandler';
 import { stripe, PLAN_PRICE_IDS } from '../services/stripe';
 import type { Plan } from '../db/types';
 
+interface CardInfo { brand: string; last4: string; exp_month: number; exp_year: number }
+interface PaymentMethodLike { card?: CardInfo }
+interface CustomerLike { invoice_settings?: { default_payment_method?: PaymentMethodLike | string | null } }
+
 const router = Router();
 
 const KNOWN_PRICE_IDS = (): string[] =>
@@ -61,6 +65,45 @@ router.post('/checkout', requireAuth, async (req: Request, res: Response, next: 
   }
 });
 
+// GET /api/billing/sync — pull latest subscription from Stripe and update plan (used after checkout redirect)
+router.get('/sync', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('stripe_customer_id')
+      .eq('id', req.user.id)
+      .single();
+
+    if (!profile?.stripe_customer_id) {
+      return res.json({ data: { plan: 'free' } });
+    }
+
+    const subscriptions = await stripe.subscriptions.list({
+      customer: profile.stripe_customer_id,
+      status: 'active',
+      limit: 1,
+    });
+
+    if (subscriptions.data.length === 0) {
+      await supabase.from('profiles').update({ plan: 'free', stripe_subscription_id: null }).eq('id', req.user.id);
+      return res.json({ data: { plan: 'free' } });
+    }
+
+    const sub = subscriptions.data[0];
+    const priceId = sub.items.data[0]?.price.id;
+    const plan: Plan = PLAN_PRICE_IDS[priceId] ?? 'free';
+
+    await supabase
+      .from('profiles')
+      .update({ plan, stripe_subscription_id: sub.id })
+      .eq('id', req.user.id);
+
+    return res.json({ data: { plan } });
+  } catch (err) {
+    return next(err);
+  }
+});
+
 // POST /api/billing/portal — create a Stripe Customer Portal session
 router.post('/portal', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -86,6 +129,95 @@ router.post('/portal', requireAuth, async (req: Request, res: Response, next: Ne
     res.json({ data: { url: session.url } });
   } catch (err) {
     next(err);
+  }
+});
+
+// GET /api/billing/subscription — fetch current subscription details with payment method
+router.get('/subscription', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('stripe_customer_id, plan')
+      .eq('id', req.user.id)
+      .single();
+
+    if (!profile?.stripe_customer_id) {
+      return res.json({ data: { plan: profile?.plan ?? 'free', subscription: null } });
+    }
+
+    const subscriptions = await stripe.subscriptions.list({
+      customer: profile.stripe_customer_id,
+      status: 'active',
+      limit: 1,
+      expand: ['data.default_payment_method', 'data.customer'],
+    });
+
+    if (subscriptions.data.length === 0) {
+      return res.json({ data: { plan: profile.plan, subscription: null } });
+    }
+
+    const sub = subscriptions.data[0];
+    const periodEnd: number = sub.items.data[0]?.current_period_end ?? 0;
+
+    let pm: PaymentMethodLike | null = null;
+    const rawPm = sub.default_payment_method;
+    if (rawPm && typeof rawPm === 'object') {
+      pm = rawPm as PaymentMethodLike;
+    } else {
+      const customer = await stripe.customers.retrieve(profile.stripe_customer_id, {
+        expand: ['invoice_settings.default_payment_method'],
+      }) as CustomerLike;
+      const invoicePm = customer.invoice_settings?.default_payment_method;
+      if (invoicePm && typeof invoicePm === 'object') pm = invoicePm as PaymentMethodLike;
+    }
+
+    return res.json({
+      data: {
+        plan: profile.plan,
+        subscription: {
+          id: sub.id,
+          status: sub.status,
+          current_period_end: periodEnd,
+          cancel_at_period_end: sub.cancel_at_period_end,
+          payment_method: pm?.card
+            ? { brand: pm.card.brand, last4: pm.card.last4, exp_month: pm.card.exp_month, exp_year: pm.card.exp_year }
+            : null,
+        },
+      },
+    });
+  } catch (err) {
+    return next(err);
+  }
+});
+
+// POST /api/billing/cancel — cancel subscription at period end
+router.post('/cancel', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('stripe_customer_id')
+      .eq('id', req.user.id)
+      .single();
+
+    if (!profile?.stripe_customer_id) {
+      throw new AppError('No subscription found', 400, 'NO_SUBSCRIPTION');
+    }
+
+    const subscriptions = await stripe.subscriptions.list({
+      customer: profile.stripe_customer_id,
+      status: 'active',
+      limit: 1,
+    });
+
+    if (subscriptions.data.length === 0) {
+      throw new AppError('No active subscription', 400, 'NO_SUBSCRIPTION');
+    }
+
+    await stripe.subscriptions.update(subscriptions.data[0].id, { cancel_at_period_end: true });
+
+    return res.json({ data: { cancelled: true } });
+  } catch (err) {
+    return next(err);
   }
 });
 

@@ -8,4 +8,5 @@ export const QUERY_KEYS = {
   adminStats: ['admin', 'stats'] as const,
   adminUsers: (page: number) => ['admin', 'users', page] as const,
   adminUser: (id: string) => ['admin', 'users', id] as const,
+  subscription: ['billing', 'subscription'] as const,
 };

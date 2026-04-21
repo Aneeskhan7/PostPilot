@@ -29,7 +29,7 @@ describe('Media Routes', () => {
 
   describe('POST /api/media/upload', () => {
     it('uploads a file successfully', async () => {
-      mockValidate.mockReturnValue(undefined);
+      mockValidate.mockReturnValue('jpg');
       mockUpload.mockResolvedValue('https://example.com/image.jpg');
 
       const res = await request(app)
@@ -68,7 +68,7 @@ describe('Media Routes', () => {
     });
 
     it('handles upload service error', async () => {
-      mockValidate.mockReturnValue(undefined);
+      mockValidate.mockReturnValue('jpg');
       mockUpload.mockRejectedValue(new Error('Upload failed'));
 
       const res = await request(app)
