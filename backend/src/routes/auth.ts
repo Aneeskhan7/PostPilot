@@ -119,7 +119,7 @@ router.get('/meta/callback', async (req: Request, res: Response) => {
 
     // Save any Facebook Pages and their linked Instagram Business Accounts
     const pages = await Meta.getUserPages(longLived.access_token);
-    console.log(`[META] Pages found: ${pages.length}`, JSON.stringify(pages.map(p => ({ id: p.id, name: p.name, ig: p.instagram_business_account ?? 'none' }))));
+    console.log(`[META] FULL PAGES RESPONSE:`, JSON.stringify(pages, null, 2));
     for (const page of pages) {
       const encryptedPageToken = encrypt(page.access_token);
 
