@@ -284,7 +284,7 @@ router.get('/meta/callback', async (req: Request, res: Response) => {
       }
     }));
 
-    // Fallback: try /me/instagram_accounts for accounts linked via Account Center
+    // Fallback A: /me/instagram_accounts edge
     const igAccounts = await Meta.getUserInstagramAccounts(longLived.access_token);
     for (const igAcc of igAccounts) {
       const { error: igDirectErr } = await supabase.from('social_accounts').upsert({
@@ -299,7 +299,25 @@ router.get('/meta/callback', async (req: Request, res: Response) => {
         page_name: null,
         is_active: true,
       }, { onConflict: 'user_id,platform,platform_account_id' });
-      if (igDirectErr) console.warn('[META] Failed to save fallback IG account:', igDirectErr.message);
+      if (igDirectErr) console.warn('[META] Failed to save IG account (edge):', igDirectErr.message);
+    }
+
+    // Fallback B: /me?fields=instagram_accounts (different path for Creator accounts)
+    const igViaFields = await Meta.getUserInstagramViaFields(longLived.access_token);
+    for (const igAcc of igViaFields) {
+      const { error: igFieldErr } = await supabase.from('social_accounts').upsert({
+        user_id: userId,
+        platform: 'instagram',
+        platform_account_id: igAcc.id,
+        platform_username: igAcc.username,
+        platform_avatar_url: igAcc.profile_picture_url ?? null,
+        access_token: encryptedUserToken,
+        token_expires_at: expiresAt,
+        page_id: null,
+        page_name: null,
+        is_active: true,
+      }, { onConflict: 'user_id,platform,platform_account_id' });
+      if (igFieldErr) console.warn('[META] Failed to save IG account (fields):', igFieldErr.message);
     }
 
     // Invalidate accounts cache so fresh data is fetched after OAuth

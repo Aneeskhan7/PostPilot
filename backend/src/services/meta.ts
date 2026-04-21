@@ -127,16 +127,34 @@ export async function getLongLivedToken(shortToken: string): Promise<LongLivedTo
   });
 }
 
-// Get Instagram accounts connected to the user's Facebook account via Accounts Centre
+// Get Instagram accounts via /me/instagram_accounts edge
 export async function getUserInstagramAccounts(userToken: string): Promise<InstagramAccount[]> {
   try {
     const data = await metaGet<{ data: InstagramAccount[] }>('/me/instagram_accounts', {
       access_token: userToken,
       fields: 'id,username,profile_picture_url',
     });
-    return data.data ?? [];
+    const result = data.data ?? [];
+    console.log(`[META] /me/instagram_accounts → ${result.length} accounts:`, result.map((a) => a.username));
+    return result;
   } catch (err) {
     console.warn('[META] getUserInstagramAccounts failed:', err instanceof Error ? err.message : err);
+    return [];
+  }
+}
+
+// Get Instagram accounts via /me fields (different path, works for Creator accounts)
+export async function getUserInstagramViaFields(userToken: string): Promise<InstagramAccount[]> {
+  try {
+    const data = await metaGet<{ instagram_accounts?: { data: InstagramAccount[] } }>('/me', {
+      access_token: userToken,
+      fields: 'instagram_accounts{id,username,profile_picture_url}',
+    });
+    const result = data.instagram_accounts?.data ?? [];
+    console.log(`[META] /me?fields=instagram_accounts → ${result.length} accounts:`, result.map((a) => a.username));
+    return result;
+  } catch (err) {
+    console.warn('[META] getUserInstagramViaFields failed:', err instanceof Error ? err.message : err);
     return [];
   }
 }
