@@ -5,6 +5,7 @@ import { supabase } from '../db/supabase';
 import { requireAuth } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { encrypt } from '../services/tokenManager';
+import { cache } from '../services/memCache';
 import * as Meta from '../services/meta';
 import * as LinkedIn from '../services/linkedin';
 
@@ -120,84 +121,34 @@ router.get('/meta/callback', async (req: Request, res: Response) => {
     // Save any Facebook Pages and their linked Instagram Business Accounts
     const pages = await Meta.getUserPages(longLived.access_token);
     console.log(`[META] FULL PAGES RESPONSE:`, JSON.stringify(pages, null, 2));
-    for (const page of pages) {
-      const encryptedPageToken = encrypt(page.access_token);
 
-      const { error: fbErr } = await supabase.from('social_accounts').upsert({
-        user_id: userId,
-        platform: 'facebook',
-        platform_account_id: page.id,
-        platform_username: page.name,
-        access_token: encryptedPageToken,
-        token_expires_at: expiresAt,
-        page_id: page.id,
-        page_name: page.name,
-        is_active: true,
-      }, { onConflict: 'user_id,platform,platform_account_id' });
-      if (fbErr) throw new Error(fbErr.message);
+    await Promise.all(pages.map(async (page) => {
+      try {
+        const encryptedPageToken = encrypt(page.access_token);
 
-      // Try to save Instagram — check nested data first, then fetch, then page fallback
-      let igSaved = false;
+        const { error: fbErr } = await supabase.from('social_accounts').upsert({
+          user_id: userId,
+          platform: 'facebook',
+          platform_account_id: page.id,
+          platform_username: page.name,
+          access_token: encryptedPageToken,
+          token_expires_at: expiresAt,
+          page_id: page.id,
+          page_name: page.name,
+          is_active: true,
+        }, { onConflict: 'user_id,platform,platform_account_id' });
+        if (fbErr) throw new Error(fbErr.message);
 
-      // First try instagram_business_account
-      if (page.instagram_business_account?.id) {
-        try {
-          const nested = page.instagram_business_account;
-          const igAccount = nested.username
-            ? nested as { id: string; username: string; profile_picture_url?: string }
-            : await Meta.getInstagramAccount(nested.id, page.access_token);
-          await supabase.from('social_accounts').upsert({
-            user_id: userId,
-            platform: 'instagram',
-            platform_account_id: igAccount.id,
-            platform_username: igAccount.username,
-            platform_avatar_url: igAccount.profile_picture_url ?? null,
-            access_token: encryptedPageToken,
-            token_expires_at: expiresAt,
-            page_id: page.id,
-            page_name: page.name,
-            is_active: true,
-          }, { onConflict: 'user_id,platform,platform_account_id' });
-          igSaved = true;
-          console.log(`[META] Saved Instagram account ${igAccount.username} via business account`);
-        } catch (e) {
-          console.warn(`[META] instagram_business_account fetch failed for page ${page.id}:`, e instanceof Error ? e.message : e);
-        }
-      }
+        // Try to save Instagram — check nested data first, then fetch, then page fallback
+        let igSaved = false;
 
-      // Try connected_instagram_account (for Creator accounts)
-      if (!igSaved && page.connected_instagram_account?.id) {
-        try {
-          const nested = page.connected_instagram_account;
-          const igAccount = nested.username
-            ? nested as { id: string; username: string; profile_picture_url?: string }
-            : await Meta.getInstagramAccount(nested.id, page.access_token);
-          await supabase.from('social_accounts').upsert({
-            user_id: userId,
-            platform: 'instagram',
-            platform_account_id: igAccount.id,
-            platform_username: igAccount.username,
-            platform_avatar_url: igAccount.profile_picture_url ?? null,
-            access_token: encryptedPageToken,
-            token_expires_at: expiresAt,
-            page_id: page.id,
-            page_name: page.name,
-            is_active: true,
-          }, { onConflict: 'user_id,platform,platform_account_id' });
-          igSaved = true;
-          console.log(`[META] Saved Instagram account ${igAccount.username} via connected account (Creator)`);
-        } catch (e) {
-          console.warn(`[META] connected_instagram_account fetch failed for page ${page.id}:`, e instanceof Error ? e.message : e);
-        }
-      }
-
-      // Try instagram_accounts array
-      if (!igSaved && page.instagram_accounts?.data?.length) {
-        try {
-          for (const igAcc of page.instagram_accounts.data) {
-            const igAccount = igAcc.username
-              ? igAcc as { id: string; username: string; profile_picture_url?: string }
-              : await Meta.getInstagramAccount(igAcc.id, page.access_token);
+        // First try instagram_business_account
+        if (page.instagram_business_account?.id) {
+          try {
+            const nested = page.instagram_business_account;
+            const igAccount = nested.username
+              ? nested as { id: string; username: string; profile_picture_url?: string }
+              : await Meta.getInstagramAccount(nested.id, page.access_token);
             await supabase.from('social_accounts').upsert({
               user_id: userId,
               platform: 'instagram',
@@ -211,67 +162,123 @@ router.get('/meta/callback', async (req: Request, res: Response) => {
               is_active: true,
             }, { onConflict: 'user_id,platform,platform_account_id' });
             igSaved = true;
-            console.log(`[META] Saved Instagram account ${igAccount.username} via instagram_accounts array`);
-            break; // Only save the first one
+            console.log(`[META] Saved Instagram account ${igAccount.username} via business account`);
+          } catch (e) {
+            console.warn(`[META] instagram_business_account fetch failed for page ${page.id}:`, e instanceof Error ? e.message : e);
           }
-        } catch (e) {
-          console.warn(`[META] instagram_accounts array fetch failed for page ${page.id}:`, e instanceof Error ? e.message : e);
         }
-      }
 
-      if (!igSaved) {
-        // Fallback 1: /{page-id}/instagram_accounts edge
-        const pageIgAccounts = await Meta.getPageInstagramAccounts(page.id, page.access_token);
-        for (const igAcc of pageIgAccounts) {
-          await supabase.from('social_accounts').upsert({
-            user_id: userId,
-            platform: 'instagram',
-            platform_account_id: igAcc.id,
-            platform_username: igAcc.username,
-            platform_avatar_url: igAcc.profile_picture_url ?? null,
-            access_token: encryptedPageToken,
-            token_expires_at: expiresAt,
-            page_id: page.id,
-            page_name: page.name,
-            is_active: true,
-          }, { onConflict: 'user_id,platform,platform_account_id' });
-          console.log(`[META] Saved Instagram via page instagram_accounts: ${igAcc.username}`);
-          igSaved = true;
+        // Try connected_instagram_account (for Creator accounts)
+        if (!igSaved && page.connected_instagram_account?.id) {
+          try {
+            const nested = page.connected_instagram_account;
+            const igAccount = nested.username
+              ? nested as { id: string; username: string; profile_picture_url?: string }
+              : await Meta.getInstagramAccount(nested.id, page.access_token);
+            await supabase.from('social_accounts').upsert({
+              user_id: userId,
+              platform: 'instagram',
+              platform_account_id: igAccount.id,
+              platform_username: igAccount.username,
+              platform_avatar_url: igAccount.profile_picture_url ?? null,
+              access_token: encryptedPageToken,
+              token_expires_at: expiresAt,
+              page_id: page.id,
+              page_name: page.name,
+              is_active: true,
+            }, { onConflict: 'user_id,platform,platform_account_id' });
+            igSaved = true;
+            console.log(`[META] Saved Instagram account ${igAccount.username} via connected account (Creator)`);
+          } catch (e) {
+            console.warn(`[META] connected_instagram_account fetch failed for page ${page.id}:`, e instanceof Error ? e.message : e);
+          }
         }
-      }
 
-      if (!igSaved) {
-        // Fallback 2: query /{page-id} directly with page token
-        const pageData = await Meta.getPageWithInstagram(page.id, page.access_token);
-
-        // Check both business and connected account fields
-        const igAcc = pageData.instagram_business_account || pageData.connected_instagram_account;
-        if (igAcc?.id) {
-          const igProfile = igAcc.username
-            ? igAcc as { id: string; username: string; profile_picture_url?: string }
-            : await Meta.getInstagramAccount(igAcc.id, page.access_token);
-          await supabase.from('social_accounts').upsert({
-            user_id: userId,
-            platform: 'instagram',
-            platform_account_id: igProfile.id,
-            platform_username: igProfile.username,
-            platform_avatar_url: igProfile.profile_picture_url ?? null,
-            access_token: encryptedPageToken,
-            token_expires_at: expiresAt,
-            page_id: page.id,
-            page_name: page.name,
-            is_active: true,
-          }, { onConflict: 'user_id,platform,platform_account_id' });
-          const accountType = pageData.instagram_business_account ? 'business' : 'connected';
-          console.log(`[META] Saved Instagram via direct page query (${accountType}): ${igProfile.username}`);
-          igSaved = true;
+        // Try instagram_accounts array
+        if (!igSaved && page.instagram_accounts?.data?.length) {
+          try {
+            for (const igAcc of page.instagram_accounts.data) {
+              const igAccount = igAcc.username
+                ? igAcc as { id: string; username: string; profile_picture_url?: string }
+                : await Meta.getInstagramAccount(igAcc.id, page.access_token);
+              await supabase.from('social_accounts').upsert({
+                user_id: userId,
+                platform: 'instagram',
+                platform_account_id: igAccount.id,
+                platform_username: igAccount.username,
+                platform_avatar_url: igAccount.profile_picture_url ?? null,
+                access_token: encryptedPageToken,
+                token_expires_at: expiresAt,
+                page_id: page.id,
+                page_name: page.name,
+                is_active: true,
+              }, { onConflict: 'user_id,platform,platform_account_id' });
+              igSaved = true;
+              console.log(`[META] Saved Instagram account ${igAccount.username} via instagram_accounts array`);
+              break; // Only save the first one
+            }
+          } catch (e) {
+            console.warn(`[META] instagram_accounts array fetch failed for page ${page.id}:`, e instanceof Error ? e.message : e);
+          }
         }
-      }
 
-      if (!igSaved) {
-        console.warn(`[META] Could not find Instagram for page ${page.id} — account may not be Professional type`);
+        if (!igSaved) {
+          // Fallback 1: /{page-id}/instagram_accounts edge
+          const pageIgAccounts = await Meta.getPageInstagramAccounts(page.id, page.access_token);
+          for (const igAcc of pageIgAccounts) {
+            await supabase.from('social_accounts').upsert({
+              user_id: userId,
+              platform: 'instagram',
+              platform_account_id: igAcc.id,
+              platform_username: igAcc.username,
+              platform_avatar_url: igAcc.profile_picture_url ?? null,
+              access_token: encryptedPageToken,
+              token_expires_at: expiresAt,
+              page_id: page.id,
+              page_name: page.name,
+              is_active: true,
+            }, { onConflict: 'user_id,platform,platform_account_id' });
+            console.log(`[META] Saved Instagram via page instagram_accounts: ${igAcc.username}`);
+            igSaved = true;
+          }
+        }
+
+        if (!igSaved) {
+          // Fallback 2: query /{page-id} directly with page token
+          const pageData = await Meta.getPageWithInstagram(page.id, page.access_token);
+
+          // Check both business and connected account fields
+          const igAcc = pageData.instagram_business_account || pageData.connected_instagram_account;
+          if (igAcc?.id) {
+            const igProfile = igAcc.username
+              ? igAcc as { id: string; username: string; profile_picture_url?: string }
+              : await Meta.getInstagramAccount(igAcc.id, page.access_token);
+            await supabase.from('social_accounts').upsert({
+              user_id: userId,
+              platform: 'instagram',
+              platform_account_id: igProfile.id,
+              platform_username: igProfile.username,
+              platform_avatar_url: igProfile.profile_picture_url ?? null,
+              access_token: encryptedPageToken,
+              token_expires_at: expiresAt,
+              page_id: page.id,
+              page_name: page.name,
+              is_active: true,
+            }, { onConflict: 'user_id,platform,platform_account_id' });
+            const accountType = pageData.instagram_business_account ? 'business' : 'connected';
+            console.log(`[META] Saved Instagram via direct page query (${accountType}): ${igProfile.username}`);
+            igSaved = true;
+          }
+        }
+
+        if (!igSaved) {
+          console.warn(`[META] Could not find Instagram for page ${page.id} — account may not be Professional type`);
+        }
+      } catch (pageError) {
+        // Don't let one page failure cancel others
+        console.error(`[META] Failed to process page ${page.id}:`, pageError instanceof Error ? pageError.message : pageError);
       }
-    }
+    }));
 
     // Fallback: try /me/instagram_accounts for accounts linked via Account Center
     const igAccounts = await Meta.getUserInstagramAccounts(longLived.access_token);
@@ -290,6 +297,9 @@ router.get('/meta/callback', async (req: Request, res: Response) => {
       }, { onConflict: 'user_id,platform,platform_account_id' });
       if (igDirectErr) console.warn('[META] Failed to save fallback IG account:', igDirectErr.message);
     }
+
+    // Invalidate accounts cache so fresh data is fetched after OAuth
+    cache.del(`accounts:${userId}`);
 
     res.redirect(`${process.env.FRONTEND_URL}/settings?connected=meta`);
   } catch (err) {
@@ -365,6 +375,9 @@ router.get('/linkedin/callback', async (req: Request, res: Response) => {
       if (orgErr) console.warn(`[LINKEDIN] Failed to save org ${org.id}: ${orgErr.message}`);
     }
 
+    // Invalidate accounts cache so fresh data is fetched after OAuth
+    cache.del(`accounts:${userId}`);
+
     res.redirect(`${process.env.FRONTEND_URL}/settings?connected=linkedin`);
   } catch (err) {
     oauthError(res, err instanceof Error ? err.message : 'LinkedIn connection failed');
@@ -395,6 +408,9 @@ router.delete('/accounts/:id', requireAuth, async (req: Request, res: Response, 
       .eq('id', id);
 
     if (deleteError) throw new Error(deleteError.message);
+
+    // Invalidate accounts cache after successful delete
+    cache.del(`accounts:${req.user.id}`);
 
     res.json({ data: { success: true } });
   } catch (err) {

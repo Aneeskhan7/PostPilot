@@ -3,12 +3,21 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { supabase } from '../db/supabase';
 import { requireAuth } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
+import { cache } from '../services/memCache';
 
 const router = Router();
 
 // GET /api/accounts — list all connected social accounts
 router.get('/', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const cacheKey = `accounts:${req.user.id}`;
+
+    // Check cache first
+    const cached = cache.get<any[]>(cacheKey);
+    if (cached) {
+      return res.json({ data: cached });
+    }
+
     const { data, error } = await supabase
       .from('social_accounts')
       .select('id, platform, platform_account_id, platform_username, platform_avatar_url, page_id, page_name, is_active, token_expires_at, created_at')
@@ -16,6 +25,9 @@ router.get('/', requireAuth, async (req: Request, res: Response, next: NextFunct
       .order('created_at', { ascending: true });
 
     if (error) throw new Error(error.message);
+
+    // Cache for 30 seconds
+    cache.set(cacheKey, data, 30_000);
 
     res.json({ data });
   } catch (err) {
@@ -68,6 +80,9 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response, next: Next
 
     if (error || !data) throw new Error(error?.message ?? 'Failed to update account');
 
+    // Invalidate cache after successful update
+    cache.del(`accounts:${req.user.id}`);
+
     res.json({ data });
   } catch (err) {
     next(err);
@@ -92,6 +107,9 @@ router.delete('/:id', requireAuth, async (req: Request, res: Response, next: Nex
       .eq('id', req.params.id);
 
     if (error) throw new Error(error.message);
+
+    // Invalidate cache after successful delete
+    cache.del(`accounts:${req.user.id}`);
 
     res.json({ data: { success: true } });
   } catch (err) {

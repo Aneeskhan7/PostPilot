@@ -2,6 +2,7 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 
 import { errorHandler } from './middleware/errorHandler';
@@ -29,6 +30,17 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
+
+app.use(compression());
+
+// Response time header for observability
+app.use((_req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    res.setHeader('x-response-time', `${Date.now() - start}ms`);
+  });
+  next();
+});
 
 // Raw body for Stripe webhook — must be before express.json()
 app.use('/api/billing/webhook', express.raw({ type: 'application/json' }));
