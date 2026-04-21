@@ -2,7 +2,7 @@
 import { FC, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, XCircle, Clock, Ban, FileEdit, Search } from 'lucide-react';
-import Sidebar from '../components/Sidebar';
+import Layout from '../components/Layout';
 import PostCard from '../components/PostCard';
 import { usePosts, useDeletePost, useCancelPost } from '../hooks/usePosts';
 import type { PostStatus, Post } from '../types';
@@ -40,10 +40,9 @@ const History: FC = () => {
   });
 
   return (
-    <div className="flex min-h-screen bg-zinc-950">
-      <Sidebar />
-      <main className="flex-1 ml-60 p-8">
-        <div className="mb-8">
+    <Layout>
+      <div className="p-4 lg:p-8">
+        <div className="mb-6 lg:mb-8">
           <h1 className="text-2xl font-bold text-white">History</h1>
           <p className="text-sm text-zinc-400 mt-0.5">All your posts in one place</p>
         </div>
@@ -109,8 +108,8 @@ const History: FC = () => {
             ))}
           </div>
         )}
-      </main>
-    </div>
+      </div>
+    </Layout>
   );
 };
 

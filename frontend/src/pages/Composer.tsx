@@ -5,7 +5,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Instagram, Facebook, Linkedin, Send, Clock, Sparkles, Loader2, Wand2 } from 'lucide-react';
-import Sidebar from '../components/Sidebar';
+import Layout from '../components/Layout';
 import MediaUploader from '../components/MediaUploader';
 import PlatformPreview from '../components/PlatformPreview';
 import { useCreatePost } from '../hooks/usePosts';
@@ -35,6 +35,7 @@ const Composer: FC = () => {
   const editId = searchParams.get('edit');
   const [previewPlatform, setPreviewPlatform] = useState<Platform>('instagram');
   const [serverError, setServerError] = useState('');
+  const [showPreview, setShowPreview] = useState(false);
 
   const createPost = useCreatePost();
   const { data: accounts = [] } = useAccounts();
@@ -131,17 +132,60 @@ const Composer: FC = () => {
   const previewAccount = accounts.find((a: { platform: string; is_active: boolean }) => a.platform === previewPlatform && a.is_active);
 
   return (
-    <div className="flex min-h-screen bg-zinc-950">
-      <Sidebar />
-
-      <div className="flex-1 ml-60 flex">
+    <Layout>
+      <div className="flex flex-col lg:flex-row min-h-[calc(100vh-3.5rem)] lg:min-h-screen">
         {/* Editor panel */}
-        <div className="flex-1 p-6 overflow-y-auto">
+        <div className="flex-1 p-4 lg:p-6 overflow-y-auto">
           <div className="max-w-2xl mx-auto">
-            <h1 className="text-2xl font-bold text-white mb-1">
-              {editId ? 'Edit Post' : 'New Post'}
-            </h1>
-            <p className="text-sm text-zinc-400 mb-8">Craft your content and schedule it across platforms</p>
+            <div className="flex items-center justify-between mb-1">
+              <h1 className="text-xl lg:text-2xl font-bold text-white">
+                {editId ? 'Edit Post' : 'New Post'}
+              </h1>
+              {/* Mobile preview toggle */}
+              <button
+                type="button"
+                onClick={() => setShowPreview(!showPreview)}
+                className="lg:hidden text-xs px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-zinc-400 hover:text-white transition-colors"
+              >
+                {showPreview ? 'Hide preview' : 'Preview'}
+              </button>
+            </div>
+            <p className="text-sm text-zinc-400 mb-6 lg:mb-8">Craft your content and schedule it across platforms</p>
+
+            {/* Mobile preview (collapsible) */}
+            {showPreview && (
+              <div className="lg:hidden mb-6 bg-white/5 border border-white/10 rounded-xl p-4 space-y-3">
+                <div className="flex gap-2">
+                  {PLATFORMS.map(({ id, icon: Icon }) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setPreviewPlatform(id)}
+                      className={`flex-1 py-1.5 rounded-lg flex items-center justify-center transition-colors ${
+                        previewPlatform === id
+                          ? 'bg-violet-600/20 text-violet-400'
+                          : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'
+                      }`}
+                      aria-label={`Preview ${id}`}
+                    >
+                      <Icon className="w-4 h-4" />
+                    </button>
+                  ))}
+                </div>
+                {!previewAccount && (
+                  <p className="text-xs text-zinc-500 text-center">
+                    {previewPlatform.charAt(0).toUpperCase() + previewPlatform.slice(1)} not connected — preview is generic
+                  </p>
+                )}
+                <PlatformPreview
+                  platform={previewPlatform}
+                  content={content}
+                  mediaUrls={mediaUrls}
+                  username={previewAccount?.platform_username ?? ''}
+                  avatarUrl={previewAccount?.platform_avatar_url}
+                />
+              </div>
+            )}
 
             <form onSubmit={(e) => { e.preventDefault(); }} className="space-y-6">
 
@@ -168,7 +212,7 @@ const Composer: FC = () => {
                     </button>
                   </div>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex gap-2 flex-wrap">
                   {PLATFORMS.map(({ id, label, icon: Icon }) => {
                     const selected = platforms?.includes(id);
                     const connected = accounts.some((a: { platform: string; is_active: boolean }) => a.platform === id && a.is_active);
@@ -179,7 +223,7 @@ const Composer: FC = () => {
                         onClick={() => togglePlatform(id)}
                         disabled={!connected}
                         title={!connected ? `Connect ${label} in Settings first` : selected ? `Remove ${label}` : `Add ${label}`}
-                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium transition-all ${
+                        className={`flex items-center gap-2 px-3 py-2 lg:px-4 lg:py-2.5 rounded-xl border text-sm font-medium transition-all ${
                           selected
                             ? 'bg-violet-600/20 border-violet-500/50 text-violet-300'
                             : connected
@@ -203,7 +247,7 @@ const Composer: FC = () => {
                   <span className="text-sm font-medium text-violet-300">AI Caption Generator</span>
                 </div>
 
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-col sm:flex-row">
                   <input
                     type="text"
                     placeholder="Describe your post topic…"
@@ -224,7 +268,7 @@ const Composer: FC = () => {
                   </select>
                 </div>
 
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <button
                     type="button"
                     onClick={handleGenerate}
@@ -242,7 +286,7 @@ const Composer: FC = () => {
                         placeholder="Improve instruction…"
                         value={improveInstruction}
                         onChange={(e) => setImproveInstruction(e.target.value)}
-                        className="flex-1 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-zinc-500 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50 transition"
+                        className="flex-1 min-w-0 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-zinc-500 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50 transition"
                       />
                       <button
                         type="button"
@@ -321,7 +365,7 @@ const Composer: FC = () => {
               )}
 
               {/* Actions */}
-              <div className="flex items-center gap-3 pt-2">
+              <div className="flex items-center gap-3 pt-2 pb-4 lg:pb-0">
                 <button
                   type="button"
                   onClick={handleSubmit((d) => onSubmit(d, false))}
@@ -344,8 +388,8 @@ const Composer: FC = () => {
           </div>
         </div>
 
-        {/* Preview panel */}
-        <div className="w-96 border-l border-white/5 p-5 flex flex-col gap-4 overflow-y-auto">
+        {/* Preview panel — desktop only */}
+        <div className="hidden lg:flex w-80 xl:w-96 border-l border-white/5 p-5 flex-col gap-4 overflow-y-auto">
           <div>
             <p className="text-sm font-medium text-zinc-300 mb-3">Preview</p>
             <div className="flex gap-2">
@@ -381,7 +425,7 @@ const Composer: FC = () => {
           />
         </div>
       </div>
-    </div>
+    </Layout>
   );
 };
 

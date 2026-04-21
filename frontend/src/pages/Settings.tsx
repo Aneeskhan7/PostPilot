@@ -17,7 +17,7 @@ const InstagramIcon: FC<{ className?: string }> = ({ className }) => (
   </svg>
 );
 
-import Sidebar from '../components/Sidebar';
+import Layout from '../components/Layout';
 import AccountBadge from '../components/AccountBadge';
 import { useAccounts, useDeleteAccount, useToggleAccount } from '../hooks/useAccounts';
 import { useAuth } from '../hooks/useAuth';
@@ -143,9 +143,8 @@ const Settings: FC = () => {
       : null;
 
   return (
-    <div className="flex min-h-screen bg-zinc-950">
-      <Sidebar />
-      <main className="flex-1 ml-60 p-8">
+    <Layout>
+      <div className="p-4 lg:p-8">
         <div className="max-w-5xl mx-auto">
           <div className="mb-8">
             <h1 className="text-2xl font-bold text-white">Settings</h1>
@@ -279,7 +278,7 @@ const Settings: FC = () => {
             )}
           </div>
         </div>
-      </main>
+      </div>
 
       {disconnectTarget && (
         <DisconnectModal
@@ -289,7 +288,7 @@ const Settings: FC = () => {
           isLoading={deleteAccount.isPending}
         />
       )}
-    </div>
+    </Layout>
   );
 };
 

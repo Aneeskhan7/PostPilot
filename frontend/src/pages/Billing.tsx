@@ -5,7 +5,7 @@ import {
   CreditCard, CheckCircle2, AlertCircle, Zap, Infinity, Star,
   Calendar, ShieldCheck, XCircle, ExternalLink, AlertTriangle,
 } from 'lucide-react';
-import Sidebar from '../components/Sidebar';
+import Layout from '../components/Layout';
 import { useProfile } from '../hooks/useProfile';
 import {
   useSubscription, useCreateCheckout, useCancelSubscription, useSyncBilling, useCreatePortal,
@@ -131,9 +131,8 @@ const Billing: FC = () => {
   };
 
   return (
-    <div className="flex min-h-screen bg-zinc-950">
-      <Sidebar />
-      <main className="flex-1 ml-60 p-8">
+    <Layout>
+      <div className="p-4 lg:p-8">
         <div className="max-w-4xl mx-auto">
           <div className="mb-8">
             <h1 className="text-2xl font-bold text-white">Billing</h1>
@@ -325,7 +324,7 @@ const Billing: FC = () => {
             </div>
           )}
         </div>
-      </main>
+      </div>
 
       {/* Cancel Confirmation Modal */}
       {showCancelModal && sub && (
@@ -337,7 +336,7 @@ const Billing: FC = () => {
           onClose={() => { if (!cancelSub.isPending) setShowCancelModal(false); }}
         />
       )}
-    </div>
+    </Layout>
   );
 };
 

@@ -1,7 +1,7 @@
 // frontend/src/pages/Calendar.tsx
 import { FC, useState } from 'react';
 import { ChevronLeft, ChevronRight, Clock } from 'lucide-react';
-import Sidebar from '../components/Sidebar';
+import Layout from '../components/Layout';
 import { usePosts } from '../hooks/usePosts';
 import type { Post } from '../types';
 
@@ -56,12 +56,11 @@ const Calendar: FC = () => {
   const selectedPosts = selectedDate ? (postsByDate[selectedDate] ?? []) : [];
 
   return (
-    <div className="flex min-h-screen bg-zinc-950">
-      <Sidebar />
-      <main className="flex-1 ml-60 p-8">
-        <div className="flex items-center justify-between mb-8">
+    <Layout>
+      <div className="p-4 lg:p-8">
+        <div className="flex items-center justify-between mb-6 lg:mb-8">
           <div>
-            <h1 className="text-2xl font-bold text-white">Calendar</h1>
+            <h1 className="text-xl lg:text-2xl font-bold text-white">Calendar</h1>
             <p className="text-sm text-zinc-400 mt-0.5">View your scheduled and published posts</p>
           </div>
         </div>
@@ -164,8 +163,8 @@ const Calendar: FC = () => {
             )}
           </div>
         </div>
-      </main>
-    </div>
+      </div>
+    </Layout>
   );
 };
 

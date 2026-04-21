@@ -2,7 +2,7 @@
 import { FC } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PenSquare, Clock, CheckCircle2, AlertCircle, TrendingUp } from 'lucide-react';
-import Sidebar from '../components/Sidebar';
+import Layout from '../components/Layout';
 import PostCard from '../components/PostCard';
 import { usePosts, useDeletePost, useCancelPost } from '../hooks/usePosts';
 import { useAccounts } from '../hooks/useAccounts';
@@ -39,29 +39,27 @@ const Dashboard: FC = () => {
   ).slice(0, 6);
 
   return (
-    <div className="flex min-h-screen bg-zinc-950">
-      <Sidebar />
-
-      <main className="flex-1 ml-60 p-8">
+    <Layout>
+      <div className="p-4 lg:p-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-6 lg:mb-8">
           <div>
-            <h1 className="text-2xl font-bold text-white">Dashboard</h1>
+            <h1 className="text-xl lg:text-2xl font-bold text-white">Dashboard</h1>
             <p className="text-sm text-zinc-400 mt-0.5">
               Welcome back{user?.email ? `, ${user.email.split('@')[0]}` : ''}
             </p>
           </div>
           <button
             onClick={() => navigate('/composer')}
-            className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold rounded-xl transition-colors shadow-lg shadow-violet-600/25"
+            className="flex items-center gap-2 px-3 py-2 lg:px-4 bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold rounded-xl transition-colors shadow-lg shadow-violet-600/25"
           >
             <PenSquare className="w-4 h-4" />
-            New Post
+            <span className="hidden sm:inline">New Post</span>
           </button>
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-6 lg:mb-8">
           <StatCard
             label="Scheduled"
             value={scheduled.length}
@@ -101,7 +99,7 @@ const Dashboard: FC = () => {
           </div>
 
           {postsLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
               {Array.from({ length: 3 }).map((_, i) => (
                 <div key={i} className="bg-white/5 border border-white/10 rounded-2xl p-5 animate-pulse">
                   <div className="h-4 bg-white/10 rounded mb-3 w-1/3" />
@@ -111,7 +109,7 @@ const Dashboard: FC = () => {
               ))}
             </div>
           ) : recent.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="flex flex-col items-center justify-center py-16 lg:py-20 text-center">
               <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-4">
                 <PenSquare className="w-6 h-6 text-zinc-500" />
               </div>
@@ -124,7 +122,7 @@ const Dashboard: FC = () => {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
               {recent.map((post: Post) => (
                 <PostCard
                   key={post.id}
@@ -137,8 +135,8 @@ const Dashboard: FC = () => {
             </div>
           )}
         </div>
-      </main>
-    </div>
+      </div>
+    </Layout>
   );
 };
 

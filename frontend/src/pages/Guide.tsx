@@ -1,7 +1,7 @@
 // frontend/src/pages/Guide.tsx
 import { FC } from 'react';
 import { Facebook, Instagram, Linkedin, Zap, CreditCard, HelpCircle } from 'lucide-react';
-import Sidebar from '../components/Sidebar';
+import Layout from '../components/Layout';
 
 interface StepProps {
   number: number;
@@ -35,9 +35,8 @@ const Section: FC<SectionProps> = ({ icon: Icon, title, children, accent = 'text
 );
 
 const Guide: FC = () => (
-  <div className="flex min-h-screen bg-zinc-950">
-    <Sidebar />
-    <main className="flex-1 ml-60 p-8"><div className="max-w-5xl mx-auto space-y-6">
+  <Layout>
+    <div className="p-4 lg:p-8"><div className="max-w-5xl mx-auto space-y-6">
       <div className="mb-2">
         <h1 className="text-2xl font-bold text-white">Getting Started Guide</h1>
         <p className="text-sm text-zinc-400 mt-1">Everything you need to connect accounts and start scheduling</p>
@@ -170,8 +169,8 @@ const Guide: FC = () => (
           ))}
         </div>
       </Section>
-    </div></main>
-  </div>
+    </div></div>
+  </Layout>
 );
 
 export default Guide;
