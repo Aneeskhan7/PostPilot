@@ -1,0 +1,21 @@
+{
+  "name": "PostPilot",
+  "short_name": "PostPilot",
+  "description": "Schedule social media posts across Instagram, Facebook, and LinkedIn",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#09090b",
+  "theme_color": "#7c3aed",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
