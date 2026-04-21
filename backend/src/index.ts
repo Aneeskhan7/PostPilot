@@ -30,8 +30,8 @@ const PORT = process.env.PORT ?? 4000;
 
 if (process.env.NODE_ENV !== 'test') {
   buildPlanPriceMap();
-  app.listen(PORT, async () => {
-    console.log(`[SERVER] PostPilot backend running on http://localhost:${PORT}`);
+  app.listen(Number(PORT), '0.0.0.0', async () => {
+    console.log(`[SERVER] PostPilot backend running on port ${PORT}`);
     await ensureBucket();
     startWorker();
   });
