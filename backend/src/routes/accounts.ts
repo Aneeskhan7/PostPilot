@@ -159,10 +159,39 @@ router.get('/debug/instagram', requireAuth, async (req: Request, res: Response, 
     const debugRes = await fetch(debugUrl.toString());
     const debugJson = await debugRes.json();
 
+    // Try querying known Instagram ID (17841437426029517) with multiple field combos
+    const igId = '17841437426029517';
+    const igDirectResults: Record<string, unknown> = {};
+
+    for (const fields of ['id,username,profile_picture_url', 'id,username', 'id,name,username', 'id']) {
+      const url = new URL(`https://graph.facebook.com/v21.0/${igId}`);
+      url.searchParams.set('access_token', token);
+      url.searchParams.set('fields', fields);
+      const r = await fetch(url.toString());
+      igDirectResults[fields] = await r.json();
+    }
+
+    // Try page's instagram_accounts edge with user token
+    const pageIgEdgeUrl = new URL('https://graph.facebook.com/v21.0/1096031986923984/instagram_accounts');
+    pageIgEdgeUrl.searchParams.set('access_token', token);
+    pageIgEdgeUrl.searchParams.set('fields', 'id,username,profile_picture_url');
+    const pageIgEdgeRes = await fetch(pageIgEdgeUrl.toString());
+    const pageIgEdgeJson = await pageIgEdgeRes.json();
+
+    // Try page directly for connected_instagram_account
+    const pageDirectUrl = new URL('https://graph.facebook.com/v21.0/1096031986923984');
+    pageDirectUrl.searchParams.set('access_token', token);
+    pageDirectUrl.searchParams.set('fields', 'id,name,access_token,connected_instagram_account{id,username},instagram_business_account{id,username}');
+    const pageDirectRes = await fetch(pageDirectUrl.toString());
+    const pageDirectJson = await pageDirectRes.json();
+
     res.json({
       facebook_username: fbAccount.platform_username,
       pages: pagesJson,
       instagram_accounts: igJson,
+      ig_direct_query: igDirectResults,
+      page_instagram_edge: pageIgEdgeJson,
+      page_direct: pageDirectJson,
       token_debug: debugJson,
     });
   } catch (err) {
