@@ -154,7 +154,7 @@ export async function getUserPages(userToken: string): Promise<PageAccount[]> {
   return data.data;
 }
 
-// Get Instagram accounts connected to a Facebook Page
+// Get Instagram accounts connected to a Facebook Page via /instagram_accounts edge
 export async function getPageInstagramAccounts(pageId: string, pageToken: string): Promise<InstagramAccount[]> {
   try {
     const data = await metaGet<{ data: InstagramAccount[] }>(`/${pageId}/instagram_accounts`, {
@@ -164,6 +164,18 @@ export async function getPageInstagramAccounts(pageId: string, pageToken: string
     return data.data ?? [];
   } catch {
     return [];
+  }
+}
+
+// Query a Page directly with page token for its linked Instagram account
+export async function getPageWithInstagram(pageId: string, pageToken: string): Promise<{ instagram_business_account?: { id: string; username?: string; profile_picture_url?: string } }> {
+  try {
+    return await metaGet(`/${pageId}`, {
+      access_token: pageToken,
+      fields: 'instagram_business_account{id,username,profile_picture_url}',
+    });
+  } catch {
+    return {};
   }
 }
 

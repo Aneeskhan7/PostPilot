@@ -164,7 +164,7 @@ router.get('/meta/callback', async (req: Request, res: Response) => {
       }
 
       if (!igSaved) {
-        // Fallback: /{page-id}/instagram_accounts
+        // Fallback 1: /{page-id}/instagram_accounts edge
         const pageIgAccounts = await Meta.getPageInstagramAccounts(page.id, page.access_token);
         for (const igAcc of pageIgAccounts) {
           await supabase.from('social_accounts').upsert({
@@ -179,9 +179,38 @@ router.get('/meta/callback', async (req: Request, res: Response) => {
             page_name: page.name,
             is_active: true,
           }, { onConflict: 'user_id,platform,platform_account_id' });
-          console.log(`[META] Saved Instagram account ${igAcc.username} via page instagram_accounts`);
+          console.log(`[META] Saved Instagram via page instagram_accounts: ${igAcc.username}`);
           igSaved = true;
         }
+      }
+
+      if (!igSaved) {
+        // Fallback 2: query /{page-id} directly with page token
+        const pageData = await Meta.getPageWithInstagram(page.id, page.access_token);
+        const igAcc = pageData.instagram_business_account;
+        if (igAcc?.id) {
+          const igProfile = igAcc.username
+            ? igAcc as { id: string; username: string; profile_picture_url?: string }
+            : await Meta.getInstagramAccount(igAcc.id, page.access_token);
+          await supabase.from('social_accounts').upsert({
+            user_id: userId,
+            platform: 'instagram',
+            platform_account_id: igProfile.id,
+            platform_username: igProfile.username,
+            platform_avatar_url: igProfile.profile_picture_url ?? null,
+            access_token: encryptedPageToken,
+            token_expires_at: expiresAt,
+            page_id: page.id,
+            page_name: page.name,
+            is_active: true,
+          }, { onConflict: 'user_id,platform,platform_account_id' });
+          console.log(`[META] Saved Instagram via direct page query: ${igProfile.username}`);
+          igSaved = true;
+        }
+      }
+
+      if (!igSaved) {
+        console.warn(`[META] Could not find Instagram for page ${page.id} — account may not be Professional type`);
       }
     }
 
