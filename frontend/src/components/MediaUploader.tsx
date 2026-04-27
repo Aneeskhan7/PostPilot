@@ -130,6 +130,7 @@ const MediaUploader: FC<MediaUploaderProps> = ({ urls, onChange, maxFiles = 4 })
             multiple
             accept="image/jpeg,image/png,image/gif,image/webp,video/mp4"
             className="sr-only"
+            onClick={(e) => e.stopPropagation()}
             onChange={(e) => upload(e.target.files)}
             aria-label="Upload media files"
           />

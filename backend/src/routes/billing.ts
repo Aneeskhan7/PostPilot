@@ -25,26 +25,46 @@ router.post('/checkout', requireAuth, async (req: Request, res: Response, next: 
       throw new AppError('Invalid price ID', 400, 'VALIDATION_ERROR');
     }
 
-    const { data: profile, error: profileErr } = await supabase
+    // Step 1: verify the profile row exists using only base columns
+    const { data: basicProfile, error: basicErr } = await supabase
       .from('profiles')
-      .select('email, stripe_customer_id')
+      .select('id, email')
       .eq('id', req.user.id)
       .single();
 
-    if (profileErr || !profile) throw new AppError('Profile not found', 404, 'NOT_FOUND');
+    if (basicErr && basicErr.code !== 'PGRST116') {
+      console.error('[BILLING] Profile fetch error:', basicErr);
+    }
 
-    let customerId = profile.stripe_customer_id ?? undefined;
+    // Fall back to JWT email if the profile row is missing (trigger may not have fired)
+    const email = basicProfile?.email ?? req.user.email;
+    if (!email) throw new AppError('User account not found', 404, 'NOT_FOUND');
+
+    // Step 2: get stripe_customer_id separately — column may not exist on older DBs
+    let customerId: string | undefined;
+    const { data: billingData, error: billingColErr } = await supabase
+      .from('profiles')
+      .select('stripe_customer_id')
+      .eq('id', req.user.id)
+      .single();
+
+    if (!billingColErr && billingData) {
+      customerId = (billingData as { stripe_customer_id?: string | null }).stripe_customer_id ?? undefined;
+    } else if (billingColErr) {
+      console.warn('[BILLING] stripe_customer_id unavailable (run migration):', billingColErr.message);
+    }
 
     if (!customerId) {
       const customer = await stripe.customers.create({
-        email: profile.email,
+        email,
         metadata: { userId: req.user.id },
       });
       customerId = customer.id;
-      await supabase
+      const { error: updErr } = await supabase
         .from('profiles')
         .update({ stripe_customer_id: customerId })
         .eq('id', req.user.id);
+      if (updErr) console.warn('[BILLING] Could not persist stripe_customer_id:', updErr.message);
     }
 
     const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:5173';
@@ -55,8 +75,8 @@ router.post('/checkout', requireAuth, async (req: Request, res: Response, next: 
       client_reference_id: req.user.id,
       metadata: { userId: req.user.id },
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${frontendUrl}/settings?billing=success`,
-      cancel_url: `${frontendUrl}/settings?billing=cancelled`,
+      success_url: `${frontendUrl}/billing?billing=success`,
+      cancel_url: `${frontendUrl}/billing?billing=cancelled`,
     });
 
     res.json({ data: { url: session.url } });

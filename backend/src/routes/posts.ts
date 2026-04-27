@@ -125,11 +125,17 @@ router.post('/', requireAuth, async (req: Request, res: Response, next: NextFunc
 
     if (error || !data) throw new Error(error?.message ?? 'Failed to create post');
 
-    if (status === 'scheduled' && body.scheduled_at) {
-      await schedulePost(data.id, new Date(body.scheduled_at));
-    }
-
     res.status(201).json({ data });
+
+    if (status === 'scheduled' && body.scheduled_at) {
+      schedulePost(data.id, new Date(body.scheduled_at)).catch(async (schedErr) => {
+        console.error('[POSTS] BullMQ schedule failed for post', data.id, schedErr);
+        await supabase
+          .from('posts')
+          .update({ status: 'failed', failure_reason: 'Scheduling service unavailable. Please retry.' })
+          .eq('id', data.id);
+      });
+    }
   } catch (err) {
     next(err);
   }
