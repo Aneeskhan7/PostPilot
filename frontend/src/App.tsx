@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store/authStore';
 
 const Login = lazy(() => import('./pages/Login'));
+const Landing = lazy(() => import('./pages/Landing'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Composer = lazy(() => import('./pages/Composer'));
 const Calendar = lazy(() => import('./pages/Calendar'));
@@ -16,6 +17,9 @@ const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'));
 const AdminUserDetail = lazy(() => import('./pages/admin/AdminUserDetail'));
 const Billing = lazy(() => import('./pages/Billing'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+const Terms = lazy(() => import('./pages/legal/Terms'));
+const Privacy = lazy(() => import('./pages/legal/Privacy'));
+const Refund = lazy(() => import('./pages/legal/Refund'));
 
 function Spinner() {
   return (
@@ -36,8 +40,14 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   const { user, isAdmin, loading } = useAuthStore();
   if (loading) return <Spinner />;
   if (!user) return <Navigate to="/login" replace />;
-  if (!isAdmin) return <Navigate to="/" replace />;
+  if (!isAdmin) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
+}
+
+function SmartHome() {
+  const { user, loading } = useAuthStore();
+  if (loading) return <Spinner />;
+  return user ? <Navigate to="/dashboard" replace /> : <Landing />;
 }
 
 export default function App() {
@@ -53,9 +63,13 @@ export default function App() {
     <BrowserRouter>
       <Suspense fallback={<Spinner />}>
         <Routes>
+          <Route path="/" element={<SmartHome />} />
           <Route path="/login" element={<Login />} />
           <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/refund" element={<Refund />} />
+          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/composer" element={<ProtectedRoute><Composer /></ProtectedRoute>} />
           <Route path="/calendar" element={<ProtectedRoute><Calendar /></ProtectedRoute>} />
           <Route path="/history" element={<ProtectedRoute><History /></ProtectedRoute>} />
@@ -67,7 +81,7 @@ export default function App() {
             <Route path="users" element={<AdminUsers />} />
             <Route path="users/:id" element={<AdminUserDetail />} />
           </Route>
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </Suspense>
     </BrowserRouter>

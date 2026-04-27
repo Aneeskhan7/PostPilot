@@ -31,7 +31,7 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { to: '/',          icon: ({ className }) => <LayoutDashboard className={className} />, label: 'Dashboard' },
+  { to: '/dashboard', icon: ({ className }) => <LayoutDashboard className={className} />, label: 'Dashboard' },
   { to: '/composer',  icon: ({ className }) => <PenSquare className={className} />,      label: 'Composer'  },
   { to: '/calendar',  icon: ({ className }) => <CalendarDays className={className} />,   label: 'Calendar'  },
   { to: '/history',   icon: ({ className }) => <History className={className} />,        label: 'History'   },
@@ -91,7 +91,7 @@ const Sidebar: FC<SidebarProps> = ({ isOpen = false, onClose }) => {
           <NavLink
             key={to}
             to={to}
-            end={to === '/'}
+            end={to === '/dashboard'}
             onClick={onClose}
             className={({ isActive }) =>
               `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${

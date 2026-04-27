@@ -2,6 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-18px); }
+}
+@keyframes float2 {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-12px); }
+}
+@keyframes float3 {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-22px); }
+}
+.float1 { animation: float 6s ease-in-out infinite; }
+.float2 { animation: float2 8s ease-in-out infinite; }
+.float3 { animation: float3 5s ease-in-out infinite 1s; }
+
 @layer base {
   * {
     box-sizing: border-box;
