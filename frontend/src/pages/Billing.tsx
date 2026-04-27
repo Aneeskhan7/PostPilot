@@ -1,5 +1,5 @@
 // frontend/src/pages/Billing.tsx
-import { FC, useState, useEffect } from 'react';
+import { FC, useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   CreditCard, CheckCircle2, AlertCircle, Zap, Infinity, Star,
@@ -10,6 +10,8 @@ import { useProfile } from '../hooks/useProfile';
 import {
   useSubscription, useCreateCheckout, useCancelSubscription, useSyncBilling, useCreatePortal,
 } from '../hooks/useBilling';
+import { useAuthStore } from '../store/authStore';
+import { createCheckoutSession } from '../lib/api/billing';
 
 const PRO_PRICE_ID = import.meta.env.VITE_STRIPE_PRO_PRICE_ID as string;
 const UNLIMITED_PRICE_ID = import.meta.env.VITE_STRIPE_UNLIMITED_PRICE_ID as string;
@@ -106,6 +108,8 @@ const Billing: FC = () => {
   const [pendingPriceId, setPendingPriceId] = useState<string | null>(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelError, setCancelError] = useState('');
+  const preloadedUrls = useRef<{ [priceId: string]: string }>({});
+  const preloading = useRef(false);
 
   const { data: profile } = useProfile();
   const { data: subData, isLoading: subLoading } = useSubscription();
@@ -113,10 +117,44 @@ const Billing: FC = () => {
   const createPortal = useCreatePortal();
   const cancelSub = useCancelSubscription();
   const syncBilling = useSyncBilling();
+  const session = useAuthStore((s) => s.session);
 
   useEffect(() => {
     if (billing === 'success') syncBilling.mutate();
   }, [billing]);
+
+  // Pre-create Stripe checkout sessions in the background so clicking is instant
+  useEffect(() => {
+    const plan = profile?.plan ?? 'free';
+    if (plan !== 'free' || !PRO_PRICE_ID || !UNLIMITED_PRICE_ID) return;
+    if (preloading.current) return;
+    preloading.current = true;
+
+    const token = session?.access_token;
+    if (!token) return;
+
+    (async () => {
+      try {
+        // Sequential — second call finds the Stripe customer created by the first
+        const proUrl = await createCheckoutSession(token, PRO_PRICE_ID);
+        preloadedUrls.current[PRO_PRICE_ID] = proUrl;
+        const unlimitedUrl = await createCheckoutSession(token, UNLIMITED_PRICE_ID);
+        preloadedUrls.current[UNLIMITED_PRICE_ID] = unlimitedUrl;
+      } catch {
+        // Silent — buttons still work via mutation fallback
+      }
+    })();
+  }, [profile?.plan, session?.access_token]);
+
+  const handleUpgrade = (priceId: string) => {
+    const preloaded = preloadedUrls.current[priceId];
+    if (preloaded) {
+      window.location.href = preloaded;
+      return;
+    }
+    setPendingPriceId(priceId);
+    createCheckout.mutate(priceId);
+  };
 
   const plan = profile?.plan ?? 'free';
   const meta = PLAN_META[plan] ?? PLAN_META.free;
@@ -283,7 +321,7 @@ const Billing: FC = () => {
                     </ul>
                   </div>
                   <button
-                    onClick={() => { setPendingPriceId(PRO_PRICE_ID); createCheckout.mutate(PRO_PRICE_ID); }}
+                    onClick={() => handleUpgrade(PRO_PRICE_ID)}
                     disabled={createCheckout.isPending || !PRO_PRICE_ID}
                     className="w-full py-2.5 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors"
                   >
@@ -313,7 +351,7 @@ const Billing: FC = () => {
                     </ul>
                   </div>
                   <button
-                    onClick={() => { setPendingPriceId(UNLIMITED_PRICE_ID); createCheckout.mutate(UNLIMITED_PRICE_ID); }}
+                    onClick={() => handleUpgrade(UNLIMITED_PRICE_ID)}
                     disabled={createCheckout.isPending || !UNLIMITED_PRICE_ID}
                     className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black text-sm font-semibold rounded-xl transition-colors"
                   >

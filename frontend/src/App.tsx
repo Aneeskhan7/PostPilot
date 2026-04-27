@@ -2,6 +2,10 @@
 import { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store/authStore';
+import { queryClient } from './lib/queryClient';
+import { QUERY_KEYS } from './lib/queryKeys';
+import * as postsApi from './lib/api/posts';
+import * as accountsApi from './lib/api/accounts';
 
 const Login = lazy(() => import('./pages/Login'));
 const Landing = lazy(() => import('./pages/Landing'));
@@ -50,12 +54,26 @@ function SmartHome() {
   return user ? <Navigate to="/dashboard" replace /> : <Landing />;
 }
 
+const API = import.meta.env.VITE_API_URL as string;
+
 export default function App() {
   const { initialize } = useAuthStore();
 
   useEffect(() => {
+    // Wake up Railway backend (prevents cold-start delay on first real request)
+    if (API) fetch(`${API}/health`).catch(() => {});
+
     let cleanup: (() => void) | undefined;
-    initialize().then((fn) => { cleanup = fn; });
+    initialize().then((fn) => {
+      cleanup = fn;
+      // Prefetch core data the moment we know the user is logged in
+      const { session } = useAuthStore.getState();
+      const token = session?.access_token;
+      if (token) {
+        queryClient.prefetchQuery({ queryKey: QUERY_KEYS.posts, queryFn: () => postsApi.fetchPosts(token) });
+        queryClient.prefetchQuery({ queryKey: QUERY_KEYS.accounts, queryFn: () => accountsApi.fetchAccounts(token) });
+      }
+    });
     return () => cleanup?.();
   }, [initialize]);
 

@@ -21,6 +21,6 @@ export function useProfile() {
       return data as Profile;
     },
     enabled: !!user,
-    staleTime: 60_000,
+    staleTime: 2 * 60_000, // 2 min — plan changes are rare mid-session
   });
 }

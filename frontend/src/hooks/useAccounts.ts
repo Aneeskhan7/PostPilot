@@ -1,30 +1,30 @@
 // frontend/src/hooks/useAccounts.ts
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAuth } from './useAuth';
+import { useAuthStore } from '../store/authStore';
 import { QUERY_KEYS } from '../lib/queryKeys';
 import * as accountsApi from '../lib/api/accounts';
 
+function useToken() {
+  return useAuthStore((s) => s.session?.access_token ?? null);
+}
+
 export function useAccounts() {
-  const { getToken } = useAuth();
+  const token = useToken();
 
   return useQuery({
     queryKey: QUERY_KEYS.accounts,
-    queryFn: async () => {
-      const token = await getToken();
-      if (!token) throw new Error('Not authenticated');
-      return accountsApi.fetchAccounts(token);
-    },
-    staleTime: 1000 * 60,
+    queryFn: () => accountsApi.fetchAccounts(token!),
+    enabled: !!token,
+    staleTime: 5 * 60_000, // accounts change rarely — 5 min
   });
 }
 
 export function useToggleAccount() {
-  const { getToken } = useAuth();
+  const token = useToken();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
-      const token = await getToken();
+    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) => {
       if (!token) throw new Error('Not authenticated');
       return accountsApi.toggleAccount(token, id, isActive);
     },
@@ -35,12 +35,11 @@ export function useToggleAccount() {
 }
 
 export function useDeleteAccount() {
-  const { getToken } = useAuth();
+  const token = useToken();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (id: string) => {
-      const token = await getToken();
+    mutationFn: (id: string) => {
       if (!token) throw new Error('Not authenticated');
       return accountsApi.deleteAccount(token, id);
     },

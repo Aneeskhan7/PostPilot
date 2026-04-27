@@ -1,18 +1,21 @@
 // frontend/src/hooks/useBilling.ts
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useAuth } from './useAuth';
+import { useAuthStore } from '../store/authStore';
 import { createCheckoutSession, createPortalSession, fetchSubscription, cancelSubscription } from '../lib/api/billing';
 import { QUERY_KEYS } from '../lib/queryKeys';
 
 const API = import.meta.env.VITE_API_URL as string;
 
+function useToken() {
+  return useAuthStore((s) => s.session?.access_token ?? null);
+}
+
 export function useSyncBilling() {
-  const { getToken } = useAuth();
+  const token = useToken();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async () => {
-      const token = await getToken();
       if (!token) return;
       const res = await fetch(`${API}/api/billing/sync`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -27,11 +30,10 @@ export function useSyncBilling() {
 }
 
 export function useCreateCheckout() {
-  const { getToken } = useAuth();
+  const token = useToken();
 
   return useMutation({
-    mutationFn: async (priceId: string) => {
-      const token = await getToken();
+    mutationFn: (priceId: string) => {
       if (!token) throw new Error('Not authenticated');
       return createCheckoutSession(token, priceId);
     },
@@ -42,11 +44,10 @@ export function useCreateCheckout() {
 }
 
 export function useCreatePortal() {
-  const { getToken } = useAuth();
+  const token = useToken();
 
   return useMutation({
-    mutationFn: async () => {
-      const token = await getToken();
+    mutationFn: () => {
       if (!token) throw new Error('Not authenticated');
       return createPortalSession(token);
     },
@@ -57,26 +58,22 @@ export function useCreatePortal() {
 }
 
 export function useSubscription() {
-  const { getToken } = useAuth();
+  const token = useToken();
 
   return useQuery({
     queryKey: QUERY_KEYS.subscription,
-    queryFn: async () => {
-      const token = await getToken();
-      if (!token) throw new Error('Not authenticated');
-      return fetchSubscription(token);
-    },
+    queryFn: () => fetchSubscription(token!),
+    enabled: !!token,
     staleTime: 60_000,
   });
 }
 
 export function useCancelSubscription() {
-  const { getToken } = useAuth();
+  const token = useToken();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async () => {
-      const token = await getToken();
+    mutationFn: () => {
       if (!token) throw new Error('Not authenticated');
       return cancelSubscription(token);
     },
